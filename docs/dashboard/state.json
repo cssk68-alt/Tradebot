@@ -1,78 +1,65 @@
 {
-  "generated_at": "2026-06-02T23:12:17.943605+00:00",
+  "generated_at": "2026-06-02T23:29:34.520436+00:00",
   "mode": "paper",
   "starting_bankroll": 1000.0,
-  "bankroll": 1018.43,
-  "realized_pnl": 18.43,
-  "n_trades": 27,
-  "n_wins": 18,
-  "n_losses": 9,
-  "win_rate": 0.6667,
-  "n_open": 5,
+  "bankroll": 898.6,
+  "realized_pnl": -101.4,
+  "n_trades": 33,
+  "n_wins": 20,
+  "n_losses": 13,
+  "win_rate": 0.6061,
+  "n_open": 4,
   "open_trades": [
     {
       "question": "Will it be the hottest month on record?",
-      "side": "YES",
-      "entry": 0.58,
-      "size": 87.8,
-      "edge": 0.345,
-      "brain": 0.987,
+      "side": "NO",
+      "entry": 0.42,
+      "size": 47.9,
+      "edge": 0.052,
+      "brain": 0.5,
       "pnl": 0.0,
       "won": null,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.918666+00:00",
+      "opened_at": "2026-06-02T23:29:34.500526+00:00",
       "resolved_at": null
     },
     {
       "question": "Will a new frontier AI model launch this month?",
       "side": "YES",
       "entry": 0.68,
-      "size": 74.9,
-      "edge": 0.245,
-      "brain": 0.82,
+      "size": 66.1,
+      "edge": 0.224,
+      "brain": 0.909,
       "pnl": 0.0,
       "won": null,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.923449+00:00",
-      "resolved_at": null
-    },
-    {
-      "question": "Will Bitcoin close above $100k this month?",
-      "side": "YES",
-      "entry": 0.62,
-      "size": 62.4,
-      "edge": 0.058,
-      "brain": 0.558,
-      "pnl": 0.0,
-      "won": null,
-      "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.928851+00:00",
+      "opened_at": "2026-06-02T23:29:34.505501+00:00",
       "resolved_at": null
     },
     {
       "question": "Will the Fed cut rates at the next meeting?",
       "side": "YES",
       "entry": 0.73,
-      "size": 69.8,
-      "edge": 0.195,
-      "brain": 0.978,
+      "size": 61.5,
+      "edge": 0.217,
+      "brain": 1.0,
       "pnl": 0.0,
       "won": null,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.933356+00:00",
+      "opened_at": "2026-06-02T23:29:34.512086+00:00",
       "resolved_at": null
     },
     {
       "question": "Will unemployment stay below 4.5% next report?",
       "side": "YES",
       "entry": 0.81,
-      "size": 62.9,
-      "edge": 0.115,
-      "brain": 0.999,
+      "size": 55.5,
+      "edge": 0.137,
+      "brain": 1.0,
       "pnl": 0.0,
       "won": null,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.937109+00:00",
+      "opened_at": "2026-06-02T23:29:34.515611+00:00",
       "resolved_at": null
     }
   ],
@@ -87,8 +74,8 @@
       "pnl": 18.52,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:10.315201+00:00",
-      "resolved_at": "2026-06-02T23:12:10.331077+00:00"
+      "opened_at": "2026-06-02T23:29:25.490929+00:00",
+      "resolved_at": "2026-06-02T23:29:25.507652+00:00"
     },
     {
       "question": "Will candidate X win the upcoming election?",
@@ -100,8 +87,8 @@
       "pnl": -32.23,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:10.320665+00:00",
-      "resolved_at": "2026-06-02T23:12:10.336634+00:00"
+      "opened_at": "2026-06-02T23:29:25.496183+00:00",
+      "resolved_at": "2026-06-02T23:29:25.513881+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -113,8 +100,8 @@
       "pnl": 24.7,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:10.324480+00:00",
-      "resolved_at": "2026-06-02T23:12:10.341689+00:00"
+      "opened_at": "2026-06-02T23:29:25.500370+00:00",
+      "resolved_at": "2026-06-02T23:29:25.519797+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -126,8 +113,8 @@
       "pnl": 18.72,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:11.073768+00:00",
-      "resolved_at": "2026-06-02T23:12:11.090477+00:00"
+      "opened_at": "2026-06-02T23:29:25.984436+00:00",
+      "resolved_at": "2026-06-02T23:29:26.014970+00:00"
     },
     {
       "question": "Will candidate X win the upcoming election?",
@@ -139,8 +126,8 @@
       "pnl": -32.58,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:11.079588+00:00",
-      "resolved_at": "2026-06-02T23:12:11.096633+00:00"
+      "opened_at": "2026-06-02T23:29:26.002964+00:00",
+      "resolved_at": "2026-06-02T23:29:26.020561+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -152,8 +139,8 @@
       "pnl": -40.74,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:11.083705+00:00",
-      "resolved_at": "2026-06-02T23:12:11.104319+00:00"
+      "opened_at": "2026-06-02T23:29:26.007402+00:00",
+      "resolved_at": "2026-06-02T23:29:26.025668+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -165,8 +152,8 @@
       "pnl": 17.71,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:11.832826+00:00",
-      "resolved_at": "2026-06-02T23:12:11.847659+00:00"
+      "opened_at": "2026-06-02T23:29:26.485875+00:00",
+      "resolved_at": "2026-06-02T23:29:26.501189+00:00"
     },
     {
       "question": "Will candidate X win the upcoming election?",
@@ -178,8 +165,8 @@
       "pnl": -30.82,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:11.837377+00:00",
-      "resolved_at": "2026-06-02T23:12:11.853613+00:00"
+      "opened_at": "2026-06-02T23:29:26.490360+00:00",
+      "resolved_at": "2026-06-02T23:29:26.507040+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -191,8 +178,8 @@
       "pnl": 23.62,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:11.840933+00:00",
-      "resolved_at": "2026-06-02T23:12:11.860627+00:00"
+      "opened_at": "2026-06-02T23:29:26.494210+00:00",
+      "resolved_at": "2026-06-02T23:29:26.512669+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -200,12 +187,12 @@
       "entry": 0.68,
       "size": 56.0,
       "edge": 0.05,
-      "brain": 0.997,
+      "brain": 1.0,
       "pnl": 17.91,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:12.359734+00:00",
-      "resolved_at": "2026-06-02T23:12:12.373322+00:00"
+      "opened_at": "2026-06-02T23:29:28.239702+00:00",
+      "resolved_at": "2026-06-02T23:29:28.253284+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -213,12 +200,12 @@
       "entry": 0.62,
       "size": 62.8,
       "edge": 0.061,
-      "brain": 0.668,
+      "brain": 0.667,
       "pnl": 23.88,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:12.365961+00:00",
-      "resolved_at": "2026-06-02T23:12:12.379442+00:00"
+      "opened_at": "2026-06-02T23:29:28.245995+00:00",
+      "resolved_at": "2026-06-02T23:29:28.258976+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -226,12 +213,12 @@
       "entry": 0.68,
       "size": 58.4,
       "edge": 0.05,
-      "brain": 0.999,
+      "brain": 1.0,
       "pnl": 18.68,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:12.868548+00:00",
-      "resolved_at": "2026-06-02T23:12:12.882902+00:00"
+      "opened_at": "2026-06-02T23:29:28.982974+00:00",
+      "resolved_at": "2026-06-02T23:29:28.996853+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -243,8 +230,8 @@
       "pnl": -40.65,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:12.874514+00:00",
-      "resolved_at": "2026-06-02T23:12:12.888833+00:00"
+      "opened_at": "2026-06-02T23:29:28.988480+00:00",
+      "resolved_at": "2026-06-02T23:29:29.002626+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -252,12 +239,12 @@
       "entry": 0.68,
       "size": 57.1,
       "edge": 0.05,
-      "brain": 0.999,
+      "brain": 1.0,
       "pnl": 18.27,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:13.389892+00:00",
-      "resolved_at": "2026-06-02T23:12:13.408489+00:00"
+      "opened_at": "2026-06-02T23:29:29.748936+00:00",
+      "resolved_at": "2026-06-02T23:29:29.762755+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -269,8 +256,8 @@
       "pnl": 24.37,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:13.396304+00:00",
-      "resolved_at": "2026-06-02T23:12:13.414470+00:00"
+      "opened_at": "2026-06-02T23:29:29.754813+00:00",
+      "resolved_at": "2026-06-02T23:29:29.769329+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -278,12 +265,12 @@
       "entry": 0.68,
       "size": 59.6,
       "edge": 0.05,
-      "brain": 0.999,
+      "brain": 1.0,
       "pnl": 19.06,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:13.871189+00:00",
-      "resolved_at": "2026-06-02T23:12:13.903897+00:00"
+      "opened_at": "2026-06-02T23:29:30.485668+00:00",
+      "resolved_at": "2026-06-02T23:29:30.499704+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -295,8 +282,8 @@
       "pnl": -41.48,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:13.896355+00:00",
-      "resolved_at": "2026-06-02T23:12:13.930679+00:00"
+      "opened_at": "2026-06-02T23:29:30.491524+00:00",
+      "resolved_at": "2026-06-02T23:29:30.506081+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -304,12 +291,12 @@
       "entry": 0.68,
       "size": 58.3,
       "edge": 0.05,
-      "brain": 0.999,
+      "brain": 1.0,
       "pnl": -39.63,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:14.725893+00:00",
-      "resolved_at": "2026-06-02T23:12:14.740255+00:00"
+      "opened_at": "2026-06-02T23:29:31.252953+00:00",
+      "resolved_at": "2026-06-02T23:29:31.267025+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -321,8 +308,8 @@
       "pnl": -40.58,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:14.732528+00:00",
-      "resolved_at": "2026-06-02T23:12:14.747695+00:00"
+      "opened_at": "2026-06-02T23:29:31.259116+00:00",
+      "resolved_at": "2026-06-02T23:29:31.272959+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
@@ -334,8 +321,8 @@
       "pnl": 17.16,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:15.487689+00:00",
-      "resolved_at": "2026-06-02T23:12:15.501418+00:00"
+      "opened_at": "2026-06-02T23:29:32.001091+00:00",
+      "resolved_at": "2026-06-02T23:29:32.014546+00:00"
     },
     {
       "question": "Will Bitcoin close above $100k this month?",
@@ -347,230 +334,338 @@
       "pnl": 22.89,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:15.493597+00:00",
-      "resolved_at": "2026-06-02T23:12:15.507354+00:00"
+      "opened_at": "2026-06-02T23:29:32.006628+00:00",
+      "resolved_at": "2026-06-02T23:29:32.020587+00:00"
+    },
+    {
+      "question": "Will it be the hottest month on record?",
+      "side": "NO",
+      "entry": 0.42,
+      "size": 65.8,
+      "edge": 0.066,
+      "brain": 0.999,
+      "pnl": 38.17,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:32.782337+00:00",
+      "resolved_at": "2026-06-02T23:29:32.817722+00:00"
     },
     {
       "question": "Will a new frontier AI model launch this month?",
       "side": "YES",
       "entry": 0.68,
       "size": 71.1,
-      "edge": 0.183,
+      "edge": 0.161,
       "brain": 0.889,
+      "pnl": 22.75,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:32.787479+00:00",
+      "resolved_at": "2026-06-02T23:29:32.823581+00:00"
+    },
+    {
+      "question": "Will a spot ETH ETF see >$1B inflows in 30 days?",
+      "side": "NO",
+      "entry": 0.59,
+      "size": 81.9,
+      "edge": 0.157,
+      "brain": 1.0,
       "pnl": -48.34,
       "won": false,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:16.275365+00:00",
-      "resolved_at": "2026-06-02T23:12:16.292158+00:00"
+      "opened_at": "2026-06-02T23:29:32.793252+00:00",
+      "resolved_at": "2026-06-02T23:29:32.829165+00:00"
+    },
+    {
+      "question": "Will Bitcoin close above $100k this month?",
+      "side": "NO",
+      "entry": 0.38,
+      "size": 109.1,
+      "edge": 0.106,
+      "brain": 0.556,
+      "pnl": -41.45,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:32.798082+00:00",
+      "resolved_at": "2026-06-02T23:29:32.835739+00:00"
+    },
+    {
+      "question": "Will team Y reach the finals?",
+      "side": "NO",
+      "entry": 0.66,
+      "size": 73.2,
+      "edge": 0.087,
+      "brain": 1.0,
+      "pnl": -48.34,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:32.802746+00:00",
+      "resolved_at": "2026-06-02T23:29:32.841520+00:00"
     },
     {
       "question": "Will the Fed cut rates at the next meeting?",
       "side": "YES",
       "entry": 0.73,
       "size": 66.2,
-      "edge": 0.134,
-      "brain": 0.478,
+      "edge": 0.213,
+      "brain": 0.622,
       "pnl": 17.88,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:16.282328+00:00",
-      "resolved_at": "2026-06-02T23:12:16.298204+00:00"
-    },
-    {
-      "question": "Will it be the hottest month on record?",
-      "side": "YES",
-      "entry": 0.58,
-      "size": 80.7,
-      "edge": 0.087,
-      "brain": 0.891,
-      "pnl": 33.9,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.028834+00:00",
-      "resolved_at": "2026-06-02T23:12:17.053020+00:00"
-    },
-    {
-      "question": "Will a new frontier AI model launch this month?",
-      "side": "YES",
-      "entry": 0.68,
-      "size": 62.1,
-      "edge": 0.058,
-      "brain": 0.801,
-      "pnl": 19.88,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.034447+00:00",
-      "resolved_at": "2026-06-02T23:12:17.058818+00:00"
-    },
-    {
-      "question": "Will the Fed cut rates at the next meeting?",
-      "side": "YES",
-      "entry": 0.73,
-      "size": 64.1,
-      "edge": 0.153,
-      "brain": 0.976,
-      "pnl": 17.32,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.041717+00:00",
-      "resolved_at": "2026-06-02T23:12:17.064235+00:00"
+      "opened_at": "2026-06-02T23:29:32.806350+00:00",
+      "resolved_at": "2026-06-02T23:29:32.847107+00:00"
     },
     {
       "question": "Will unemployment stay below 4.5% next report?",
       "side": "YES",
       "entry": 0.81,
-      "size": 57.8,
-      "edge": 0.073,
-      "brain": 1.0,
-      "pnl": 10.98,
+      "size": 59.7,
+      "edge": 0.133,
+      "brain": 0.998,
+      "pnl": 11.34,
       "won": true,
       "mode": "paper",
-      "opened_at": "2026-06-02T23:12:17.045428+00:00",
-      "resolved_at": "2026-06-02T23:12:17.069630+00:00"
+      "opened_at": "2026-06-02T23:29:32.809985+00:00",
+      "resolved_at": "2026-06-02T23:29:32.852561+00:00"
+    },
+    {
+      "question": "Will it be the hottest month on record?",
+      "side": "NO",
+      "entry": 0.42,
+      "size": 109.4,
+      "edge": 0.27,
+      "brain": 1.0,
+      "pnl": -45.94,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:33.656044+00:00",
+      "resolved_at": "2026-06-02T23:29:33.683434+00:00"
+    },
+    {
+      "question": "Will a new frontier AI model launch this month?",
+      "side": "YES",
+      "entry": 0.68,
+      "size": 67.6,
+      "edge": 0.203,
+      "brain": 0.9,
+      "pnl": 21.62,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:33.661282+00:00",
+      "resolved_at": "2026-06-02T23:29:33.690951+00:00"
+    },
+    {
+      "question": "Will Bitcoin close above $100k this month?",
+      "side": "NO",
+      "entry": 0.38,
+      "size": 62.3,
+      "edge": 0.064,
+      "brain": 0.5,
+      "pnl": -23.66,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:33.666942+00:00",
+      "resolved_at": "2026-06-02T23:29:33.696081+00:00"
+    },
+    {
+      "question": "Will the Fed cut rates at the next meeting?",
+      "side": "YES",
+      "entry": 0.73,
+      "size": 62.9,
+      "edge": 0.149,
+      "brain": 1.0,
+      "pnl": 16.99,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:33.671548+00:00",
+      "resolved_at": "2026-06-02T23:29:33.701194+00:00"
+    },
+    {
+      "question": "Will unemployment stay below 4.5% next report?",
+      "side": "YES",
+      "entry": 0.81,
+      "size": 56.7,
+      "edge": 0.069,
+      "brain": 1.0,
+      "pnl": 10.78,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-02T23:29:33.675248+00:00",
+      "resolved_at": "2026-06-02T23:29:33.705989+00:00"
     }
   ],
   "equity_curve": [
     {
-      "t": "2026-06-02T23:12:10.331077+00:00",
+      "t": "2026-06-02T23:29:25.507652+00:00",
       "pnl": 18.52,
       "cum": 1018.52
     },
     {
-      "t": "2026-06-02T23:12:10.336634+00:00",
+      "t": "2026-06-02T23:29:25.513881+00:00",
       "pnl": -32.23,
       "cum": 986.29
     },
     {
-      "t": "2026-06-02T23:12:10.341689+00:00",
+      "t": "2026-06-02T23:29:25.519797+00:00",
       "pnl": 24.7,
       "cum": 1010.99
     },
     {
-      "t": "2026-06-02T23:12:11.090477+00:00",
+      "t": "2026-06-02T23:29:26.014970+00:00",
       "pnl": 18.72,
       "cum": 1029.72
     },
     {
-      "t": "2026-06-02T23:12:11.096633+00:00",
+      "t": "2026-06-02T23:29:26.020561+00:00",
       "pnl": -32.58,
       "cum": 997.13
     },
     {
-      "t": "2026-06-02T23:12:11.104319+00:00",
+      "t": "2026-06-02T23:29:26.025668+00:00",
       "pnl": -40.74,
       "cum": 956.4
     },
     {
-      "t": "2026-06-02T23:12:11.847659+00:00",
+      "t": "2026-06-02T23:29:26.501189+00:00",
       "pnl": 17.71,
       "cum": 974.11
     },
     {
-      "t": "2026-06-02T23:12:11.853613+00:00",
+      "t": "2026-06-02T23:29:26.507040+00:00",
       "pnl": -30.82,
       "cum": 943.29
     },
     {
-      "t": "2026-06-02T23:12:11.860627+00:00",
+      "t": "2026-06-02T23:29:26.512669+00:00",
       "pnl": 23.62,
       "cum": 966.91
     },
     {
-      "t": "2026-06-02T23:12:12.373322+00:00",
+      "t": "2026-06-02T23:29:28.253284+00:00",
       "pnl": 17.91,
       "cum": 984.81
     },
     {
-      "t": "2026-06-02T23:12:12.379442+00:00",
+      "t": "2026-06-02T23:29:28.258976+00:00",
       "pnl": 23.88,
       "cum": 1008.69
     },
     {
-      "t": "2026-06-02T23:12:12.882902+00:00",
+      "t": "2026-06-02T23:29:28.996853+00:00",
       "pnl": 18.68,
       "cum": 1027.38
     },
     {
-      "t": "2026-06-02T23:12:12.888833+00:00",
+      "t": "2026-06-02T23:29:29.002626+00:00",
       "pnl": -40.65,
       "cum": 986.73
     },
     {
-      "t": "2026-06-02T23:12:13.408489+00:00",
+      "t": "2026-06-02T23:29:29.762755+00:00",
       "pnl": 18.27,
       "cum": 1005.0
     },
     {
-      "t": "2026-06-02T23:12:13.414470+00:00",
+      "t": "2026-06-02T23:29:29.769329+00:00",
       "pnl": 24.37,
       "cum": 1029.37
     },
     {
-      "t": "2026-06-02T23:12:13.903897+00:00",
+      "t": "2026-06-02T23:29:30.499704+00:00",
       "pnl": 19.06,
       "cum": 1048.44
     },
     {
-      "t": "2026-06-02T23:12:13.930679+00:00",
+      "t": "2026-06-02T23:29:30.506081+00:00",
       "pnl": -41.48,
       "cum": 1006.96
     },
     {
-      "t": "2026-06-02T23:12:14.740255+00:00",
+      "t": "2026-06-02T23:29:31.267025+00:00",
       "pnl": -39.63,
       "cum": 967.33
     },
     {
-      "t": "2026-06-02T23:12:14.747695+00:00",
+      "t": "2026-06-02T23:29:31.272959+00:00",
       "pnl": -40.58,
       "cum": 926.75
     },
     {
-      "t": "2026-06-02T23:12:15.501418+00:00",
+      "t": "2026-06-02T23:29:32.014546+00:00",
       "pnl": 17.16,
       "cum": 943.92
     },
     {
-      "t": "2026-06-02T23:12:15.507354+00:00",
+      "t": "2026-06-02T23:29:32.020587+00:00",
       "pnl": 22.89,
       "cum": 966.8
     },
     {
-      "t": "2026-06-02T23:12:16.292158+00:00",
+      "t": "2026-06-02T23:29:32.817722+00:00",
+      "pnl": 38.17,
+      "cum": 1004.98
+    },
+    {
+      "t": "2026-06-02T23:29:32.823581+00:00",
+      "pnl": 22.75,
+      "cum": 1027.72
+    },
+    {
+      "t": "2026-06-02T23:29:32.829165+00:00",
       "pnl": -48.34,
-      "cum": 918.46
+      "cum": 979.38
     },
     {
-      "t": "2026-06-02T23:12:16.298204+00:00",
+      "t": "2026-06-02T23:29:32.835739+00:00",
+      "pnl": -41.45,
+      "cum": 937.93
+    },
+    {
+      "t": "2026-06-02T23:29:32.841520+00:00",
+      "pnl": -48.34,
+      "cum": 889.59
+    },
+    {
+      "t": "2026-06-02T23:29:32.847107+00:00",
       "pnl": 17.88,
-      "cum": 936.34
+      "cum": 907.47
     },
     {
-      "t": "2026-06-02T23:12:17.053020+00:00",
-      "pnl": 33.9,
-      "cum": 970.25
+      "t": "2026-06-02T23:29:32.852561+00:00",
+      "pnl": 11.34,
+      "cum": 918.81
     },
     {
-      "t": "2026-06-02T23:12:17.058818+00:00",
-      "pnl": 19.88,
-      "cum": 990.13
+      "t": "2026-06-02T23:29:33.683434+00:00",
+      "pnl": -45.94,
+      "cum": 872.87
     },
     {
-      "t": "2026-06-02T23:12:17.064235+00:00",
-      "pnl": 17.32,
-      "cum": 1007.45
+      "t": "2026-06-02T23:29:33.690951+00:00",
+      "pnl": 21.62,
+      "cum": 894.49
     },
     {
-      "t": "2026-06-02T23:12:17.069630+00:00",
-      "pnl": 10.98,
-      "cum": 1018.43
+      "t": "2026-06-02T23:29:33.696081+00:00",
+      "pnl": -23.66,
+      "cum": 870.83
+    },
+    {
+      "t": "2026-06-02T23:29:33.701194+00:00",
+      "pnl": 16.99,
+      "cum": 887.82
+    },
+    {
+      "t": "2026-06-02T23:29:33.705989+00:00",
+      "pnl": 10.78,
+      "cum": 898.6
     }
   ],
   "brain": {
     "trained": true,
-    "experiences": 27,
-    "wins": 18,
-    "losses": 9
+    "experiences": 33,
+    "wins": 20,
+    "losses": 13
   },
   "lessons": [
     {
@@ -584,14 +679,9 @@
       "recommendation": "reinforce similar edge/sentiment patterns"
     },
     {
-      "category": "win",
-      "cause": "profitable setup",
-      "recommendation": "reinforce similar edge/sentiment patterns"
-    },
-    {
-      "category": "win",
-      "cause": "profitable setup",
-      "recommendation": "reinforce similar edge/sentiment patterns"
+      "category": "loss",
+      "cause": "thin edge",
+      "recommendation": "avoid similar setups; trust the brain veto"
     },
     {
       "category": "win",
@@ -615,18 +705,23 @@
     },
     {
       "category": "loss",
-      "cause": "thin edge",
+      "cause": "adverse resolution",
       "recommendation": "avoid similar setups; trust the brain veto"
     },
     {
       "category": "loss",
-      "cause": "thin edge",
+      "cause": "adverse resolution",
       "recommendation": "avoid similar setups; trust the brain veto"
     },
     {
       "category": "loss",
-      "cause": "thin edge",
+      "cause": "adverse resolution",
       "recommendation": "avoid similar setups; trust the brain veto"
+    },
+    {
+      "category": "win",
+      "cause": "profitable setup",
+      "recommendation": "reinforce similar edge/sentiment patterns"
     },
     {
       "category": "win",

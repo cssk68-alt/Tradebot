@@ -51,6 +51,52 @@ def run(
 
 
 @app.command()
+def backtest(
+    n: int = typer.Option(500, help="number of synthetic markets"),
+    seed: int = typer.Option(7),
+    signal: float = typer.Option(0.6, help="signal strength 0..1 (the edge the bot can see)"),
+):
+    """Monte-Carlo backtest of the strategy over synthetic markets."""
+    from tradebot.backtest import run_backtest
+
+    r = run_backtest(get_settings(), n=n, seed=seed, signal_strength=signal)
+    log.info(
+        "Backtest: %d markets -> %d trades | win-rate %.1f%% | ROI %+.1f%% | "
+        "PnL %+.2f | avg-edge %.3f | max-DD %.1f%%",
+        r.n_markets, r.n_trades, r.win_rate * 100, r.roi * 100, r.total_pnl,
+        r.avg_edge, r.max_drawdown * 100,
+    )
+    log.info("Bankroll: %.2f -> %.2f", r.start_bankroll, r.end_bankroll)
+
+
+@app.command()
+def settle(
+    mode: str = typer.Option(None, help="paper | live (overrides .env)"),
+    loop: bool = typer.Option(False, help="keep polling"),
+    interval: float = typer.Option(60.0, help="seconds between polls when --loop"),
+    iterations: int = typer.Option(0, help="max polls with --loop (0 = until none open)"),
+):
+    """Poll for resolution of open trades and settle them (live-settlement polling)."""
+    import time as _time
+
+    from tradebot.orchestrator import Orchestrator
+
+    s = get_settings()
+    if mode:
+        s.mode = mode
+    orch = Orchestrator(s, log)
+    i = 0
+    while True:
+        resolved = orch.settle_open()
+        open_left = len(orch.store.open_trades(orch.mode))
+        log.info("settle: %d resolved this poll, %d still open", len(resolved), open_left)
+        i += 1
+        if not loop or (iterations and i >= iterations) or (iterations == 0 and open_left == 0):
+            break
+        _time.sleep(interval)
+
+
+@app.command()
 def export(out: str = typer.Option(None, help="output path for the dashboard state.json")):
     """Write the dashboard snapshot (docs/dashboard/state.json) from the current DB."""
     from tradebot.brain.feedback import Brain

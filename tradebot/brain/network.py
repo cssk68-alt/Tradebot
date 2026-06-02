@@ -89,3 +89,95 @@ class NeuralBrain:
             return True
         except Exception:
             return False
+
+
+class TorchBrain:
+    """PyTorch MLP backend with the SAME interface and SAME .npz weight format as
+    NeuralBrain, so learned weights are interoperable between the two backends."""
+
+    def __init__(self, input_dim: int, hidden: int = 16, seed: int = 7):
+        import torch
+        import torch.nn as nn
+
+        self.torch = torch
+        torch.manual_seed(seed)
+        self.input_dim = input_dim
+        self.hidden = hidden
+        self.net = nn.Sequential(nn.Linear(input_dim, hidden), nn.ReLU(), nn.Linear(hidden, 1))
+        self.mu = np.zeros(input_dim)
+        self.sd = np.ones(input_dim)
+        self.trained = False
+
+    def _norm(self, X: np.ndarray) -> np.ndarray:
+        return (X - self.mu) / self.sd
+
+    def predict(self, features: list[float]) -> float:
+        if not self.trained:
+            return 0.5
+        t = self.torch
+        x = t.tensor(self._norm(np.array([features], dtype=float)), dtype=t.float32)
+        with t.no_grad():
+            p = t.sigmoid(self.net(x)).item()
+        return float(min(1.0, max(0.0, p)))
+
+    def train(self, X: list[list[float]], y: list[int], epochs: int = 400, lr: float = 0.05) -> bool:
+        if len(y) < 8 or len(set(y)) < 2:
+            return False
+        t = self.torch
+        Xa = np.array(X, dtype=float)
+        self.mu = Xa.mean(axis=0)
+        self.sd = Xa.std(axis=0) + 1e-6
+        xt = t.tensor(self._norm(Xa), dtype=t.float32)
+        yt = t.tensor(np.array(y, dtype=float).reshape(-1, 1), dtype=t.float32)
+        opt = t.optim.Adam(self.net.parameters(), lr=lr)
+        loss_fn = t.nn.BCEWithLogitsLoss()
+        for _ in range(epochs):
+            opt.zero_grad()
+            loss_fn(self.net(xt), yt).backward()
+            opt.step()
+        self.trained = True
+        return True
+
+    def save(self, path) -> None:
+        sd = self.net.state_dict()
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            path,
+            w1=sd["0.weight"].cpu().numpy().T, b1=sd["0.bias"].cpu().numpy(),
+            w2=sd["2.weight"].cpu().numpy().T, b2=sd["2.bias"].cpu().numpy(),
+            mu=self.mu, sd=self.sd, trained=np.array([self.trained]),
+        )
+
+    def load(self, path) -> bool:
+        try:
+            d = np.load(path)
+        except Exception:
+            return False
+        try:
+            if d["w1"].shape[0] != self.input_dim:
+                return False
+            t = self.torch
+            self.net.load_state_dict(
+                {
+                    "0.weight": t.tensor(d["w1"].T, dtype=t.float32),
+                    "0.bias": t.tensor(d["b1"], dtype=t.float32),
+                    "2.weight": t.tensor(d["w2"].T, dtype=t.float32),
+                    "2.bias": t.tensor(d["b2"], dtype=t.float32),
+                }
+            )
+            self.mu, self.sd = d["mu"], d["sd"]
+            self.trained = bool(d["trained"][0])
+            return True
+        except Exception:
+            return False
+
+
+def make_brain(input_dim: int, hidden: int = 16, seed: int = 7):
+    """Return a PyTorch-backed brain if torch is installed, else the numpy one.
+    Both use the same .npz format, so weights carry over between backends."""
+    try:
+        import torch  # noqa: F401
+
+        return TorchBrain(input_dim, hidden, seed)
+    except Exception:
+        return NeuralBrain(input_dim, hidden, seed)

@@ -4,7 +4,7 @@ in `data/` and load in both paper and live mode, so learning carries over."""
 from __future__ import annotations
 
 from tradebot.brain.experience import to_xy
-from tradebot.brain.network import NeuralBrain
+from tradebot.brain.network import make_brain
 from tradebot.ml.features import FEATURE_DIM
 from tradebot.models import Experience
 
@@ -13,7 +13,7 @@ class Brain:
     def __init__(self, path, log, input_dim: int = FEATURE_DIM):
         self.path = str(path)
         self.log = log
-        self.net = NeuralBrain(input_dim)
+        self.net = make_brain(input_dim)
         if self.net.load(self.path):
             self.log.info("Brain: loaded existing weights from %s", self.path)
 

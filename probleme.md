@@ -41,9 +41,15 @@ Umgebungsgrenzen), mit Wissensstand und Lösungsweg für deinen Rechner.
   sodass trotzdem Signale/Trades entstehen. Lokal liefern die Quellen echte Texte
   (VADER- oder Claude-Sentiment).
 
-## 5. Neuronales Netz: numpy statt PyTorch
-- **Hinweis:** Das „Gehirn" (`brain/network.py`) ist ein eigenständiges numpy-MLP
-  (ReLU + Sigmoid, BCE, Backprop) — bewusst leichtgewichtig und immer lauffähig,
-  ohne den großen `torch`-Download. Gleiche Schnittstelle; PyTorch kann später
-  dahinter getauscht werden. Funktional erfüllt: lernt aus Wins **und** Losses,
-  Gewichte persistieren (`data/brain.npz`) und gelten paper- wie live-übergreifend.
+## 5. PyTorch-Backend — implementiert und verifiziert (Install war zäh)
+- **Stand:** Das „Gehirn" hat **zwei Backends** mit identischer Schnittstelle und
+  **gleichem `.npz`-Format** (`brain/network.py`): das numpy-MLP (Fallback) und ein
+  **PyTorch-MLP** (`TorchBrain`). `make_brain()` wählt automatisch PyTorch, sobald
+  `torch` installiert ist. Beide lernen aus Wins **und** Losses; Gewichte
+  persistieren und gelten paper- wie live-übergreifend.
+- **Install-Stolperstein:** `download.pytorch.org/whl/cpu` ist in der Sandbox
+  geblockt („No matching distribution found"). Über den **Default-PyPI-Index**
+  (`pip install torch`) hat es schließlich geklappt (großer Download, dauert).
+- **Verifiziert:** torch 2.12 installiert, `make_brain()` liefert `TorchBrain`, der
+  Paper-Loop läuft damit fehlerfrei, und `tests/test_brain_torch.py` (Lernen +
+  numpy↔torch-Interop) ist grün. Auf deinem Rechner genügt `pip install torch`.

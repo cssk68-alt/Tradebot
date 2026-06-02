@@ -57,6 +57,12 @@ python -m tradebot.cli run --loop --iterations 8
 
 # Live, but build + confirm WITHOUT sending (safe dry-run)
 python -m tradebot.cli run --mode live --dry-run
+
+# Backtest the strategy over synthetic markets (Monte Carlo)
+python -m tradebot.cli backtest --n 500 --signal 0.6
+
+# Settle open trades by polling for resolution (live-settlement polling)
+python -m tradebot.cli settle --mode live --loop --interval 300
 ```
 
 In a single `run`, trades are placed but settle on the next cycle, so use
