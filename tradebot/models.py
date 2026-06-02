@@ -41,9 +41,13 @@ class Market(BaseModel):
     def days_to_resolution(self, now: Optional[datetime] = None) -> float:
         if self.end_date is None:
             return 9999.0
-        tz = self.end_date.tzinfo or timezone.utc
-        now = now or datetime.now(tz)
-        return (self.end_date - now).total_seconds() / 86400.0
+        end = self.end_date
+        if end.tzinfo is None:  # treat naive timestamps as UTC
+            end = end.replace(tzinfo=timezone.utc)
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        return (end - now).total_seconds() / 86400.0
 
 
 class Candidate(BaseModel):

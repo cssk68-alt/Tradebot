@@ -9,8 +9,6 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from tradebot.data.fixtures import sample_markets
 from tradebot.models import Market
 
@@ -47,15 +45,24 @@ class GammaClient:
             self.log.warning("Gamma unavailable (%s) — using built-in fixtures", e)
             return sample_markets()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=4), reraise=True)
     def _get(self, path: str, params: dict):
         if httpx is None:
             raise RuntimeError("httpx not installed")
-        r = httpx.get(
-            BASE + path, params=params, timeout=self.timeout, headers=_BROWSER_HEADERS,
-        )
-        r.raise_for_status()
-        return r.json()
+        last_err = None
+        for _ in range(3):  # retry transport/5xx only; 4xx (e.g. 403) fails fast
+            try:
+                r = httpx.get(
+                    BASE + path, params=params, timeout=self.timeout, headers=_BROWSER_HEADERS,
+                )
+            except Exception as e:
+                last_err = e
+                continue
+            if r.status_code >= 500:
+                last_err = RuntimeError(f"HTTP {r.status_code}")
+                continue
+            r.raise_for_status()
+            return r.json()
+        raise last_err or RuntimeError("request failed")
 
     def _fetch_live(self) -> list[Market]:
         out: list[Market] = []
