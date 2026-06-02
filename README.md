@@ -83,6 +83,27 @@ All knobs live in `.env` (see `.env.example`): `MODE`, `BANKROLL`,
 `MIN_VOLUME_24H`, `EDGE_THRESHOLD`, `CONFIDENCE_THRESHOLD`, `BRAIN_WEIGHT`,
 `BRAIN_VETO_THRESHOLD`, and the resolution-time window.
 
+## Dashboard (GitHub Pages)
+
+A simple static dashboard lives in `docs/` and reads `docs/dashboard/state.json`,
+which is written automatically at the end of every `run` (or via
+`python -m tradebot.cli export`). It shows bankroll / PnL, win rate, an equity
+curve, the brain's status, recent trades, and lessons — no server needed.
+
+Enable it once: repo **Settings → Pages → Source: Deploy from a branch →
+Branch `main` (or your branch) / folder `/docs`**. The site is then at:
+
+```
+https://cssk68-alt.github.io/Tradebot/
+```
+
+Preview locally with any static server:
+
+```bash
+python -m tradebot.cli run --loop --iterations 12   # refresh the data
+python -m http.server -d docs 8000                  # open http://localhost:8000
+```
+
 ## Tests
 
 ```bash

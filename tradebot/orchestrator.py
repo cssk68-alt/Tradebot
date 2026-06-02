@@ -98,7 +98,16 @@ class Orchestrator:
             "=== Cycle done: %d candidates, %d signals, %d trades placed ===",
             len(candidates), len(signals), len(placed),
         )
+        self._export_dashboard()
         return placed
+
+    def _export_dashboard(self) -> None:
+        try:
+            from tradebot.dashboard import export_state
+
+            export_state(self.store, self.settings, self.brain, self.settings.dashboard_path)
+        except Exception as e:  # never let the dashboard break a run
+            self.log.warning("dashboard export failed: %s", e)
 
     def run_loop(self, iterations: int = 5, interval: float = 0.0):
         for i in range(iterations):

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tradebot Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">▣</span>
+      <h1>Tradebot</h1>
+      <span id="modeBadge" class="badge">—</span>
+    </div>
+    <div class="updated">Updated <span id="generatedAt">—</span></div>
+  </header>
+
+  <main>
+    <section id="kpis" class="kpi-grid"></section>
+
+    <section class="panel">
+      <h2>Pipeline</h2>
+      <div class="pipeline">
+        <div class="stage"><span class="num">1</span><b>Scan</b><small>filter markets</small></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">2</span><b>Research</b><small>RSS + Reddit</small></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">3</span><b>Prediction</b><small>XGBoost + Claude</small></div>
+        <div class="arrow">→</div>
+        <div class="stage"><span class="num">4</span><b>Risk</b><small>Kelly + veto</small></div>
+        <div class="arrow">→</div>
+        <div class="stage brain"><span class="num">5</span><b>Brain</b><small>learns &amp; feeds back</small></div>
+      </div>
+    </section>
+
+    <div class="two-col">
+      <section class="panel">
+        <h2>Equity curve</h2>
+        <div id="equityChart" class="chart"></div>
+      </section>
+      <section class="panel">
+        <h2>Brain</h2>
+        <div id="brainPanel"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Resolved trades</h2>
+      <div id="resolvedTable" class="table-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Open positions</h2>
+      <div id="openTable" class="table-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Lessons learned</h2>
+      <div id="lessons"></div>
+    </section>
+
+    <footer class="foot">
+      Paper = simulation. Live = real funds, confirmed per trade.
+      Data: <code>docs/dashboard/state.json</code>, written by <code>python -m tradebot.cli run</code>.
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

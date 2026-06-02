@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # Paths
     db_path: Path = DATA_DIR / "tradebot.db"
     brain_path: Path = DATA_DIR / "brain.npz"
+    dashboard_path: Path = ROOT / "docs" / "dashboard" / "state.json"
 
     @property
     def has_anthropic(self) -> bool:

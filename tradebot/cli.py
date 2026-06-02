@@ -50,6 +50,20 @@ def run(
         orch.run_once()
 
 
+@app.command()
+def export(out: str = typer.Option(None, help="output path for the dashboard state.json")):
+    """Write the dashboard snapshot (docs/dashboard/state.json) from the current DB."""
+    from tradebot.brain.feedback import Brain
+    from tradebot.dashboard import export_state
+    from tradebot.store.db import Store
+
+    s = get_settings()
+    store = Store(s.db_path)
+    brain = Brain(s.brain_path, log)
+    path = export_state(store, s, brain, out or s.dashboard_path)
+    log.info("Wrote dashboard state to %s", path)
+
+
 @app.command("derive-creds")
 def derive_creds():
     """Derive Polymarket API creds from POLYMARKET_PRIVATE_KEY (prints .env lines)."""
