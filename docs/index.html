@@ -21,6 +21,30 @@
   </header>
 
   <main>
+    <section class="panel" id="controlPanel">
+      <h2>Steuerung</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <button id="startBtn" type="button" style="padding:8px 18px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#16a34a;color:#fff">▶ Start</button>
+        <button id="stopBtn" type="button" disabled style="padding:8px 18px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#dc2626;color:#fff;opacity:.5">■ Stop</button>
+        <label style="font-size:13px;color:#374151">Modus
+          <select id="runMode" style="margin-left:4px">
+            <option value="paper" selected>Paper (Simulation)</option>
+            <option value="live">Live (echtes Geld)</option>
+          </select>
+        </label>
+        <label style="font-size:13px;color:#374151">Intervall
+          <input id="runInterval" type="number" value="60" min="5" style="width:60px;margin-left:4px" /> s
+        </label>
+        <span id="runStatus" class="badge">idle</span>
+      </div>
+      <div id="liveGuard" hidden style="margin-top:10px;padding:10px 12px;border:1px solid #fca5a5;background:#fef2f2;border-radius:8px;font-size:13px">
+        <b style="color:#b91c1c">⚠ Live-Modus handelt mit echtem Geld.</b>
+        <label style="display:block;margin-top:6px"><input type="checkbox" id="liveAck" /> Ich verstehe das Risiko.</label>
+        <label style="display:block;margin-top:6px">Tippe <code>LIVE</code> zum Bestätigen: <input id="liveConfirm" type="text" autocomplete="off" placeholder="LIVE" style="width:90px" /></label>
+      </div>
+      <div id="runMsg" class="muted" style="margin-top:8px"></div>
+    </section>
+
     <section id="kpis" class="kpi-grid"></section>
 
     <section class="panel">

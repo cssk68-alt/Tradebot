@@ -66,6 +66,91 @@ def _atomic_write_json(path: Path, obj: object) -> None:
             os.unlink(tmp)
 
 
+class _Runner:
+    """Runs the orchestrator loop in a background thread (paper, or gated live).
+
+    The HTTP server stays responsive because the blocking cycle (DeepSeek/Gamma
+    calls) runs off-thread. Live trading can only be armed with an explicit
+    confirm token, so a stray POST can never start real-money trading."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+        self.mode = ""
+        self.strategy = ""
+        self.interval = 60.0
+        self.cycle = 0
+        self.last = ""
+        self.error = ""
+        self.started_at = ""
+
+    @property
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def status(self) -> dict:
+        return {
+            "running": self.running, "mode": self.mode, "strategy": self.strategy,
+            "cycle": self.cycle, "last": self.last, "error": self.error,
+            "started_at": self.started_at,
+        }
+
+    def start(self, mode: str, strategy: str, interval: float, confirm: str) -> dict:
+        with self._lock:
+            if self.running:
+                return {"ok": False, "error": "läuft bereits"}
+            mode = "live" if str(mode).lower() == "live" else "paper"
+            # Server-side guard: live needs the explicit token even if the UI is
+            # bypassed — defense in depth for real money.
+            if mode == "live" and confirm != "LIVE":
+                return {"ok": False, "error": "Live erfordert confirm=LIVE"}
+            self._stop.clear()
+            self.mode, self.strategy = mode, strategy or "scalp"
+            self.interval = max(5.0, float(interval))
+            self.cycle, self.last, self.error = 0, "", ""
+            import time as _t
+
+            self.started_at = _t.strftime("%H:%M:%S")
+            self._thread = threading.Thread(target=self._loop, daemon=True)
+            self._thread.start()
+            return {"ok": True, **self.status()}
+
+    def stop(self) -> dict:
+        self._stop.set()
+        return {"ok": True, "stopping": True}
+
+    def _loop(self) -> None:
+        try:
+            from tradebot.config import get_settings
+            from tradebot.log import get_logger
+            from tradebot.orchestrator import Orchestrator
+
+            s = get_settings()
+            s.mode, s.strategy = self.mode, self.strategy
+            log = get_logger("tradebot")
+            # Live orders were gated at start (confirm == "LIVE"); auto-approve here
+            # so the background loop is not blocked on stdin. Paper ignores confirm.
+            confirm = (lambda order: True) if self.mode == "live" else None
+            orch = Orchestrator(s, log, confirm=confirm)
+            while not self._stop.is_set():
+                self.cycle += 1
+                placed = orch.run_once()
+                self.last = f"Zyklus {self.cycle}: {len(placed)} Trade(s) platziert"
+                self._stop.wait(self.interval)
+            try:
+                orch.manage_open(orch.exchange.list_markets())  # final sweep on stop
+            except Exception:
+                pass
+        except Exception as e:
+            self.error = f"{type(e).__name__}: {e}"
+        finally:
+            self._stop.set()
+
+
+RUNNER = _Runner()
+
+
 class _Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DOCS), **kwargs)
@@ -81,19 +166,35 @@ class _Handler(SimpleHTTPRequestHandler):
         elif self.path == "/api/state":
             p = DOCS / "dashboard" / "state.json"
             self._json(json.loads(p.read_text()) if p.exists() else {})
+        elif self.path == "/api/status":
+            self._json(RUNNER.status())
         else:
             super().do_GET()
 
     def do_POST(self):
         if self.path == "/api/config":
-            n = int(self.headers.get("Content-Length", 0))
-            data = json.loads(self.rfile.read(n))
+            data = self._read_json()
             clean = {k: data[k] for k in DEFAULTS if k in data}
             _atomic_write_json(CONFIG_PATH, clean)
             self._json({"ok": True})
+        elif self.path == "/api/run":
+            d = self._read_json()
+            self._json(RUNNER.start(
+                d.get("mode", "paper"), d.get("strategy", "scalp"),
+                d.get("interval", 60.0), d.get("confirm", ""),
+            ))
+        elif self.path == "/api/stop":
+            self._json(RUNNER.stop())
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _read_json(self) -> dict:
+        n = int(self.headers.get("Content-Length", 0))
+        try:
+            return json.loads(self.rfile.read(n)) if n else {}
+        except Exception:
+            return {}
 
     def _json(self, obj: object) -> None:
         body = json.dumps(obj).encode()

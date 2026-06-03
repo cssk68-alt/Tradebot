@@ -114,3 +114,79 @@ function lessonsHtml(ls) {
 }
 
 load();
+
+// --- run controls (Start/Stop via the local serve() API) ---
+let _apiOk = false;
+
+async function _postJSON(path, body) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  return r.json();
+}
+
+function renderRunStatus(st) {
+  const badge = $("runStatus");
+  const running = !!(st && st.running);
+  badge.textContent = running
+    ? `running · ${st.mode} · Zyklus ${st.cycle}`
+    : (st && st.error ? "Fehler" : "idle");
+  badge.className = "badge " + (running ? (st.mode === "live" ? "live" : "paper") : "");
+  const start = $("startBtn"), stop = $("stopBtn");
+  start.disabled = running;
+  stop.disabled = !running;
+  start.style.opacity = running ? 0.5 : 1;
+  stop.style.opacity = running ? 1 : 0.5;
+  $("runMsg").textContent = (st && st.error) ? "⚠ " + st.error : (st && st.last) || "";
+}
+
+async function pollStatus() {
+  try {
+    const st = await fetch("/api/status", { cache: "no-store" }).then((r) => r.json());
+    _apiOk = true;
+    renderRunStatus(st);
+    if (st.running) load(); // refresh KPIs/tables while the loop runs
+  } catch (e) {
+    if (!_apiOk) {
+      // Not served by serve() (e.g. GitHub Pages) — controls only work locally.
+      $("runStatus").textContent = "—";
+      $("startBtn").disabled = $("stopBtn").disabled = true;
+      $("startBtn").style.opacity = $("stopBtn").style.opacity = 0.5;
+      $("runMsg").textContent = "Steuerung nur lokal: python -m tradebot.cli serve";
+    }
+  }
+}
+
+function wireControls() {
+  const modeSel = $("runMode");
+  modeSel.addEventListener("change", () => {
+    $("liveGuard").hidden = modeSel.value !== "live";
+  });
+  $("startBtn").addEventListener("click", async () => {
+    const mode = modeSel.value;
+    const interval = parseFloat($("runInterval").value) || 60;
+    const body = { mode, strategy: "scalp", interval };
+    if (mode === "live") {
+      if (!$("liveAck").checked || $("liveConfirm").value.trim() !== "LIVE") {
+        $("runMsg").textContent = "Live abgebrochen: Häkchen setzen und LIVE eintippen.";
+        return;
+      }
+      if (!window.confirm("WIRKLICH live mit ECHTEM GELD starten?")) return;
+      body.confirm = "LIVE";
+    }
+    const r = await _postJSON("/api/run", body);
+    if (!r.ok) $("runMsg").textContent = "Start fehlgeschlagen: " + (r.error || "");
+    pollStatus();
+  });
+  $("stopBtn").addEventListener("click", async () => {
+    await _postJSON("/api/stop", {});
+    $("runMsg").textContent = "Stop angefordert — endet nach dem laufenden Zyklus.";
+    pollStatus();
+  });
+}
+
+wireControls();
+pollStatus();
+setInterval(pollStatus, 4000);
