@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Local runtime artifacts (DB, model weights, brain state).
+# Anchored to repo root so the source package tradebot/data/ is NOT ignored.
+/data/
+*.db
+*.npz
+*.pt
+*.joblib
