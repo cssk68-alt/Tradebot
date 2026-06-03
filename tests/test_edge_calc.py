@@ -22,7 +22,7 @@ def _candidate(yes_price=0.5):
 
 def test_buys_yes_on_positive_edge(tmp_path):
     agent = _agent(tmp_path)
-    reports = {"m": ResearchReport(market_id="m", sentiment=0.8)}  # heuristic prob ~0.70
+    reports = {"m": ResearchReport(market_id="m", sentiment=0.8, n_sources=8)}  # heuristic prob ~0.70
     sigs = agent.run([_candidate()], reports)
     assert len(sigs) == 1
     assert sigs[0].is_yes is True
@@ -31,7 +31,7 @@ def test_buys_yes_on_positive_edge(tmp_path):
 
 def test_buys_no_on_negative_edge(tmp_path):
     agent = _agent(tmp_path)
-    reports = {"m": ResearchReport(market_id="m", sentiment=-0.8)}  # heuristic prob ~0.30
+    reports = {"m": ResearchReport(market_id="m", sentiment=-0.8, n_sources=8)}  # heuristic prob ~0.30
     sigs = agent.run([_candidate()], reports)
     assert len(sigs) == 1
     assert sigs[0].is_yes is False
@@ -39,5 +39,13 @@ def test_buys_no_on_negative_edge(tmp_path):
 
 def test_no_signal_when_no_edge(tmp_path):
     agent = _agent(tmp_path)
-    reports = {"m": ResearchReport(market_id="m", sentiment=0.0)}  # prob == price
+    reports = {"m": ResearchReport(market_id="m", sentiment=0.0, n_sources=8)}  # prob == price
+    assert agent.run([_candidate()], reports) == []
+
+
+def test_no_signal_without_research_sources(tmp_path):
+    # PAPER is held to the same bar as live: no external research -> no trade,
+    # even with a strong sentiment edge that would otherwise buy YES.
+    agent = _agent(tmp_path)
+    reports = {"m": ResearchReport(market_id="m", sentiment=0.8, n_sources=0)}
     assert agent.run([_candidate()], reports) == []

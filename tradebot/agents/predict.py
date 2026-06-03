@@ -27,11 +27,13 @@ class PredictAgent(Agent):
             m = c.market
             report = reports.get(m.id)
 
-            # HARD-FAIL gate: with real money, never act without real external
-            # research. No sources -> no trade (no synthetic/offline-prior edges).
-            if s.mode == "live" and (report is None or report.n_sources == 0):
+            # HARD-FAIL gate (PAPER and LIVE alike): never act without real
+            # external research. No sources -> no trade (no synthetic/offline-prior
+            # edges). Paper is held to the exact same bar as live, so a paper track
+            # record is meaningful and transfers 1:1 to real money.
+            if report is None or report.n_sources == 0:
                 self.log.info(
-                    "Predict: live skip '%s' — no external research sources", m.question[:40]
+                    "Predict: skip '%s' — no external research sources", m.question[:40]
                 )
                 continue
 
