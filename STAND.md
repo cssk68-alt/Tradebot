@@ -2,6 +2,27 @@
 
 Stand: 2026-06-03 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
+## Provider-agnostischer LLM-Client + Agent-Pflicht (neu, 2026-06-03)
+
+Option B umgesetzt: der LLM-Zugriff läuft jetzt über eine **provider-agnostische
+Schicht** (`tradebot/llm/`), und der Agent ist **verbindlich** (Hard-Fail ohne Key).
+
+- **`tradebot/llm/client.py`** — abstraktes `LLMClient`-Interface; ALLE Prompts/
+  Parsing leben hier. Ein Provider liefert nur `available` + `_complete()`.
+- **`AnthropicClient`** (`llm/claude.py`, Alias `Claude`) und **`DeepSeekClient`**
+  (`llm/deepseek.py`, OpenAI-kompatibel über `httpx`, ~10x günstiger).
+- **Factory** `make_client(settings)` (`llm/__init__.py`) wählt per `LLM_PROVIDER`
+  (`anthropic` | `deepseek`, **Default: deepseek**).
+- **Hard-Fail (Brain+Agent gekoppelt):** `Orchestrator.__init__` bricht VOR dem
+  Zyklus mit `LLMUnavailableError` ab, wenn kein Agent verfügbar ist; die CLI gibt
+  eine klare Meldung + Exit 1. „Agent da → alles; Agent weg → nix."
+- **BrainManager: kein Auto-Approve mehr** — ohne Agent **fail-closed (Veto)**,
+  auch im Paper-Modus.
+- **Config:** `.env` → `LLM_PROVIDER`, `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY`,
+  `*_MODEL`; Properties `has_llm` / `llm_api_key`.
+- **Tests:** `tests/test_llm_client.py` (15 neu) — Interface, Factory-Dispatch,
+  `available`-Gate, DeepSeek-Transport (gemockt), Orchestrator-Hard-Fail.
+
 ## Refactor: Hard-Fail-Architektur + BrainManager (neu, 2026-06-03)
 
 Der große Umbau in dieser Runde — der Bot handelt ab jetzt **nur noch mit echten
@@ -28,9 +49,11 @@ Daten**. Es gibt keine erfundenen Notfall-Signale mehr.
 - Haiku prüft auf **logische Widersprüche** und entscheidet final
   **„Execution Approved" / „Execution Vetoed"**. Die Begründung jeder Entscheidung
   wird **zwingend in die DB** geschrieben (Tabelle `manager_decisions`).
-- **Fail-closed**, wenn die LLM-Antwort unbrauchbar ist; **Auto-Approve** ohne
-  API-Key, damit der Paper-Modus auch ohne Anthropic-Key auf echten Signalen läuft.
-- Modell: vorhandener Haiku-Wrapper `claude-haiku-4-5-20251001`.
+- **Fail-closed, immer:** unbrauchbare LLM-Antwort → Veto; **kein Agent → Veto**
+  (kein Auto-Approve mehr, auch nicht im Paper-Modus). In der Praxis bricht der
+  Orchestrator ohne Agent ohnehin beim Start ab (Hard-Fail) — das ist Defense-in-Depth.
+- Provider-agnostisch über `LLMClient` (Default DeepSeek; Anthropic-Modell
+  `claude-haiku-4-5-20251001`). Siehe Abschnitt „Provider-agnostischer LLM-Client" oben.
 
 ### 3. Behobene Schwachstellen (aus dem Vulnerability-Assessment)
 - **Live-Close (Prio 1):** `PolymarketExchange.close` markiert einen Trade nur nach
@@ -144,11 +167,12 @@ Daten**. Es gibt keine erfundenen Notfall-Signale mehr.
 
 ## Setup beim Nutzer (lokal)
 1. `git clone` / `git pull` des Repos.
-2. **`ANTHROPIC_API_KEY` in `.env` eintragen** (Vorlage: `.env.example`; `.env` ist
-   gitignored). **Hinweis:** Ohne Key bleibt das Sentiment neutral und der
-   BrainManager auto-approved — es gibt **keine** Fallback-Signale mehr (VADER/
-   Fixtures/Offline-Prior sind entfernt). Für sinnvolle Signale ist der Key
-   empfohlen, und es braucht echten Netzzugang zu Gamma / Google News / Reddit.
+2. **LLM-Agent ist Pflicht:** `LLM_PROVIDER` wählen und den passenden Key in `.env`
+   eintragen — Default `deepseek` → `DEEPSEEK_API_KEY`, alternativ `anthropic` →
+   `ANTHROPIC_API_KEY` (Vorlage: `.env.example`; `.env` ist gitignored). **Ohne Key
+   startet der Bot nicht** (Hard-Fail, kein Auto-Approve, keine Fallback-Signale —
+   VADER/Fixtures/Offline-Prior sind entfernt). Zusätzlich braucht es echten
+   Netzzugang zu Gamma / Google News / Reddit.
 3. **Doppelklick `Start.bat`** → installiert Abhängigkeiten, öffnet Dashboard unter
    `http://localhost:8080`, Einstellungen unter `/settings.html`.
 

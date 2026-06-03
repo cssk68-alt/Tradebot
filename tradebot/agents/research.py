@@ -17,9 +17,9 @@ from tradebot.models import Candidate, ResearchReport
 class ResearchAgent(Agent):
     name = "research"
 
-    def __init__(self, settings, store, log, claude=None):
+    def __init__(self, settings, store, log, client=None):
         super().__init__(settings, store, log)
-        self.claude = claude
+        self.client = client
 
     async def _one(self, c: Candidate) -> ResearchReport:
         q = c.market.question
@@ -27,9 +27,9 @@ class ResearchAgent(Agent):
             asyncio.to_thread(rss.fetch_headlines, q),
             asyncio.to_thread(reddit.search_reddit, q),
         )
-        rss_score, rss_narr = await asyncio.to_thread(sentiment.analyze, rss_texts, q, self.claude)
+        rss_score, rss_narr = await asyncio.to_thread(sentiment.analyze, rss_texts, q, self.client)
         reddit_score, reddit_narr = await asyncio.to_thread(
-            sentiment.analyze, reddit_texts, q, self.claude
+            sentiment.analyze, reddit_texts, q, self.client
         )
         n_rss, n_reddit = len(rss_texts), len(reddit_texts)
         total = n_rss + n_reddit

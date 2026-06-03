@@ -1,17 +1,19 @@
-"""Anthropic / Claude wrapper with graceful degradation and prompt caching.
+"""Anthropic (Claude) implementation of :class:`LLMClient`.
 
-If no API key or SDK is present, `available` is False and callers fall back to
-heuristics, so the bot still runs in paper mode without a key.
+Only the transport lives here — prompts and parsing are shared in
+``tradebot.llm.client``. Uses prompt caching on the system block. ``Claude`` is
+kept as a backwards-compatible alias for ``AnthropicClient``.
 """
 from __future__ import annotations
 
-import json
 from typing import Optional
+
+from tradebot.llm.client import LLMClient
 
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
 
-class Claude:
+class AnthropicClient(LLMClient):
     def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL):
         self.model = model
         self._client = None
@@ -41,102 +43,6 @@ class Claude:
         except Exception:
             return None
 
-    def sentiment(self, question: str, texts: list[str]):
-        joined = "\n".join(f"- {t}" for t in texts[:15])
-        out = self._complete(
-            "You are a market sentiment analyst. Respond ONLY with compact JSON "
-            '{"sentiment": <float -1..1>, "narrative": "<one sentence>"}.',
-            f"Market: {question}\nSources:\n{joined}",
-            max_tokens=200,
-        )
-        if not out:
-            return None
-        try:
-            d = json.loads(_json_slice(out))
-            return max(-1.0, min(1.0, float(d["sentiment"]))), str(d.get("narrative", ""))
-        except Exception:
-            return None
 
-    def estimate_prob(self, question: str, narrative: str, market_price: float, lessons: str):
-        out = self._complete(
-            "You are a calibrated forecaster for binary prediction markets. Respond ONLY "
-            'with JSON {"prob": <0..1>, "confidence": <0..1>, "reason": "<short>"}.',
-            f"Question: {question}\nMarket-implied YES prob: {market_price:.2f}\n"
-            f"Narrative: {narrative}\nPast lessons:\n{lessons}",
-            max_tokens=250,
-        )
-        if not out:
-            return None
-        try:
-            d = json.loads(_json_slice(out))
-            return (
-                max(0.0, min(1.0, float(d["prob"]))),
-                max(0.0, min(1.0, float(d.get("confidence", 0.5)))),
-                str(d.get("reason", "")),
-            )
-        except Exception:
-            return None
-
-    def decide_execution(
-        self,
-        question: str,
-        is_yes: bool,
-        model_prob: float,
-        brain_score: float,
-        edge: float,
-        rss_sentiment: float,
-        reddit_sentiment: float,
-        rss_sources: int,
-        reddit_sources: int,
-    ) -> Optional[tuple[bool, str]]:
-        """BrainManager (Stage 5): final approve/veto verdict on a trade.
-
-        Haiku sees the math model, the MLP veto and the SEPARATE Reddit/RSS
-        sentiment and looks for logical contradictions. Returns
-        ``(approved, reason)`` or ``None`` if no parseable verdict came back."""
-        side = "YES" if is_yes else "NO"
-        out = self._complete(
-            "You are the BrainManager, the final risk meta-controller for a prediction-market "
-            "trading bot. You receive the XGBoost probability that YES resolves, the neural-net "
-            "(MLP) veto score in [0,1] (higher = more confident the trade wins), the executable "
-            "edge, and SEPARATE Reddit vs RSS sentiment. Approve only if the signals are mutually "
-            "consistent; veto if you detect a logical contradiction — e.g. sentiment strongly "
-            "opposes the traded side, the MLP veto score is low while the edge is thin, or Reddit "
-            "hype contradicts the RSS news signal. Respond ONLY with JSON "
-            '{"approved": <true|false>, "reason": "<one sentence>"}.',
-            f"Traded side: {side}\n"
-            f"XGBoost P(YES): {model_prob:.3f}\n"
-            f"MLP veto score: {brain_score:.3f}\n"
-            f"Executable edge: {edge:+.3f}\n"
-            f"RSS sentiment: {rss_sentiment:+.2f} from {rss_sources} sources\n"
-            f"Reddit sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources",
-            max_tokens=200,
-        )
-        if not out:
-            return None
-        try:
-            d = json.loads(_json_slice(out))
-            return bool(d["approved"]), str(d.get("reason", ""))
-        except Exception:
-            return None
-
-    def postmortem(self, trade_desc: str):
-        out = self._complete(
-            "You are five expert analysts (data, signal, risk, market, timing) running a "
-            "trade postmortem. Identify the single biggest lesson. Respond ONLY with JSON "
-            '{"category":"<word>","cause":"<short>","recommendation":"<short>"}.',
-            trade_desc,
-            max_tokens=250,
-        )
-        if not out:
-            return None
-        try:
-            d = json.loads(_json_slice(out))
-            return d.get("category", "general"), d.get("cause", ""), d.get("recommendation", "")
-        except Exception:
-            return None
-
-
-def _json_slice(s: str) -> str:
-    a, b = s.find("{"), s.rfind("}")
-    return s[a : b + 1] if a >= 0 and b > a else s
+# Backwards-compatible alias (old code imported ``Claude``).
+Claude = AnthropicClient

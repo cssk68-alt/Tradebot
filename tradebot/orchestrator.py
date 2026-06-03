@@ -15,7 +15,7 @@ from tradebot.brain.feedback import Brain
 from tradebot.data.gamma import DataUnavailableError, GammaClient
 from tradebot.exchange.paper import PaperExchange
 from tradebot.exchange.polymarket import PolymarketExchange
-from tradebot.llm.claude import Claude
+from tradebot.llm import LLMUnavailableError, make_client
 from tradebot.ml.bootstrap import predictor_training_data
 from tradebot.ml.model import Predictor
 from tradebot.models import Experience, Mode
@@ -26,9 +26,22 @@ class Orchestrator:
     def __init__(self, settings, log, dry_run: bool = False, confirm: Optional[Callable] = None):
         self.settings = settings
         self.log = log
+
+        # HARD-FAIL (coupled Brain+Agent design): no LLM agent -> no input signals
+        # for the brain and no calibration feedback -> a run is pointless. Abort
+        # BEFORE building anything, with an actionable message. Agent da -> alles
+        # funktioniert; Agent nicht da -> nix funktioniert.
+        self.client = make_client(settings)
+        if not self.client.available:
+            raise LLMUnavailableError(
+                f"No LLM agent available for LLM_PROVIDER={settings.llm_provider!r}. "
+                f"Set the matching API key in .env "
+                f"({'ANTHROPIC_API_KEY' if settings.llm_provider == 'anthropic' else 'DEEPSEEK_API_KEY'}). "
+                "The bot is a coupled Brain+Agent system and will not run without an agent."
+            )
+
         self.store = Store(settings.db_path)
         self.gamma = GammaClient(log)
-        self.claude = Claude(settings.anthropic_api_key)
         self.brain = Brain(settings.brain_path, log)
         self.predictor = Predictor(log)
         self.mode = Mode.LIVE if settings.mode == "live" else Mode.PAPER
@@ -41,13 +54,13 @@ class Orchestrator:
             self.confirm = None
 
         self.scan = ScanAgent(settings, self.store, log)
-        self.research = ResearchAgent(settings, self.store, log, self.claude)
+        self.research = ResearchAgent(settings, self.store, log, self.client)
         self.predict = PredictAgent(
-            settings, self.store, log, self.predictor, self.brain, self.claude
+            settings, self.store, log, self.predictor, self.brain, self.client
         )
-        self.manager = BrainManager(settings, self.store, log, self.claude)
+        self.manager = BrainManager(settings, self.store, log, self.client)
         self.risk = RiskAgent(settings, self.store, log, self.exchange, self.confirm)
-        self.postmortem = PostmortemAgent(settings, self.store, log, self.claude)
+        self.postmortem = PostmortemAgent(settings, self.store, log, self.client)
 
         self._train_models()
 
@@ -148,7 +161,7 @@ class Orchestrator:
         candidates = self.scan.run(markets)
         reports = self.research.run(candidates)
         signals = self.predict.run(candidates, reports)
-        # Stage 5 meta-controller: Claude Haiku approves/vetoes each signal before
+        # Stage 5 meta-controller: the LLM agent approves/vetoes each signal before
         # it can reach execution, and records its reasoning to the DB.
         approved = self.manager.run(signals, reports)
         liq = {c.market.id: c.market.liquidity for c in candidates}

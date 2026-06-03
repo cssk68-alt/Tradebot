@@ -10,6 +10,18 @@ app = typer.Typer(add_completion=False, help="Multi-agent prediction-market bot 
 log = get_logger("tradebot")
 
 
+def _build_orchestrator(s, **kw):
+    """Construct the Orchestrator, turning the no-agent hard-fail into a clean exit."""
+    from tradebot.llm import LLMUnavailableError
+    from tradebot.orchestrator import Orchestrator
+
+    try:
+        return Orchestrator(s, log, **kw)
+    except LLMUnavailableError as e:
+        log.error("%s", e)
+        raise typer.Exit(1)
+
+
 @app.command()
 def scan():
     """Stage 1 only: scan + filter markets and print the shortlist."""
@@ -39,14 +51,12 @@ def run(
     dry_run: bool = typer.Option(False, help="live mode: build + confirm but DON'T send orders"),
 ):
     """Run the full pipeline (scan -> research -> predict -> risk -> execute -> learn)."""
-    from tradebot.orchestrator import Orchestrator
-
     s = get_settings()
     if mode:
         s.mode = mode
     if strategy:
         s.strategy = strategy
-    orch = Orchestrator(s, log, dry_run=dry_run)
+    orch = _build_orchestrator(s, dry_run=dry_run)
     if loop:
         orch.run_loop(iterations=iterations, interval=interval)
     else:
@@ -64,13 +74,11 @@ def scalp(
     Paper mode learns from real price moves (net of spread) without risking money."""
     import time as _time
 
-    from tradebot.orchestrator import Orchestrator
-
     s = get_settings()
     s.strategy = "scalp"
     if mode:
         s.mode = mode
-    orch = Orchestrator(s, log)
+    orch = _build_orchestrator(s)
     deadline = _time.time() + minutes * 60.0
     i = 0
     while True:
@@ -138,12 +146,10 @@ def settle(
     """Poll for resolution of open trades and settle them (live-settlement polling)."""
     import time as _time
 
-    from tradebot.orchestrator import Orchestrator
-
     s = get_settings()
     if mode:
         s.mode = mode
-    orch = Orchestrator(s, log)
+    orch = _build_orchestrator(s)
     i = 0
     while True:
         resolved = orch.settle_open()

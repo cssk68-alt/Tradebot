@@ -14,8 +14,13 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    # LLM
+    # LLM — provider-agnostic. Pick with LLM_PROVIDER; only the matching key is
+    # needed. DeepSeek is the default for the paper phase (~10x cheaper).
+    llm_provider: str = "deepseek"  # "anthropic" | "deepseek"
     anthropic_api_key: str = ""
+    deepseek_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+    deepseek_model: str = "deepseek-chat"
 
     # Execution
     mode: str = "paper"  # "paper" | "live"
@@ -54,6 +59,17 @@ class Settings(BaseSettings):
     db_path: Path = DATA_DIR / "tradebot.db"
     brain_path: Path = DATA_DIR / "brain.npz"
     dashboard_path: Path = ROOT / "docs" / "dashboard" / "state.json"
+
+    @property
+    def llm_api_key(self) -> str:
+        """The API key for the currently selected provider."""
+        keys = {"anthropic": self.anthropic_api_key, "deepseek": self.deepseek_api_key}
+        return keys.get(self.llm_provider.lower(), "").strip()
+
+    @property
+    def has_llm(self) -> bool:
+        """True iff the selected provider has a key configured."""
+        return bool(self.llm_api_key)
 
     @property
     def has_anthropic(self) -> bool:

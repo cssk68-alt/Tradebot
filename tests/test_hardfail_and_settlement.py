@@ -307,11 +307,12 @@ def test_manager_fails_closed_on_unparseable_llm(tmp_path):
     assert mgr.run([_signal()], {"m": ResearchReport(market_id="m")}) == []
 
 
-def test_manager_auto_approves_without_llm(tmp_path):
+def test_manager_vetoes_without_llm(tmp_path):
+    # No auto-approve fallback, not even in paper mode: no agent -> fail-closed veto.
     s = _settings(tmp_path)
     store = Store(s.db_path)
-    mgr = BrainManager(s, store, log, claude=None)
+    mgr = BrainManager(s, store, log, client=None)
     out = mgr.run([_signal()], {"m": ResearchReport(market_id="m")})
-    assert len(out) == 1
+    assert out == []
     row = store.conn.execute("SELECT approved FROM manager_decisions").fetchone()
-    assert row["approved"] == 1
+    assert row["approved"] == 0

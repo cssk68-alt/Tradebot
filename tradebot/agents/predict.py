@@ -1,4 +1,4 @@
-"""Stage 3: combine XGBoost + Claude + the brain into a calibrated edge -> Signal."""
+"""Stage 3: combine XGBoost + LLM agent + the brain into a calibrated edge -> Signal."""
 from __future__ import annotations
 
 from tradebot.agents.base import Agent
@@ -10,11 +10,11 @@ from tradebot.store.lessons import format_lessons
 class PredictAgent(Agent):
     name = "predict"
 
-    def __init__(self, settings, store, log, predictor, brain, claude=None):
+    def __init__(self, settings, store, log, predictor, brain, client=None):
         super().__init__(settings, store, log)
         self.predictor = predictor
         self.brain = brain
-        self.claude = claude
+        self.client = client
 
     def run(
         self, candidates: list[Candidate], reports: dict[str, ResearchReport]
@@ -41,8 +41,8 @@ class PredictAgent(Agent):
             true_prob = model_prob
             llm_bump = 0.0
             reason = "model"
-            if self.claude is not None and self.claude.available and report is not None:
-                est = self.claude.estimate_prob(m.question, report.narrative, m.yes_price, lessons)
+            if self.client is not None and self.client.available and report is not None:
+                est = self.client.estimate_prob(m.question, report.narrative, m.yes_price, lessons)
                 if est is not None:
                     llm_prob, llm_conf, reason = est
                     true_prob = 0.5 * model_prob + 0.5 * llm_prob

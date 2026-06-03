@@ -1,4 +1,4 @@
-"""Sentiment analysis — Claude when available, otherwise strictly neutral.
+"""Sentiment analysis — the LLM agent when available, otherwise strictly neutral.
 
 HARD-FAIL policy: there is NO deterministic offline prior and NO VADER fallback.
 When there is no real external text (RSS/Reddit returned nothing), or when no
@@ -11,15 +11,15 @@ from __future__ import annotations
 NEUTRAL: tuple[float, str] = (0.0, "No external data; neutral sentiment.")
 
 
-def analyze(texts: list[str], market_question: str, claude=None) -> tuple[float, str]:
+def analyze(texts: list[str], market_question: str, client=None) -> tuple[float, str]:
     """Return ``(sentiment in [-1, 1], narrative)``.
 
     Neutral whenever there is no real data to score, so a missing source can never
     turn into a synthetic trading signal."""
     if not texts:
         return NEUTRAL
-    if claude is not None and claude.available:
-        res = claude.sentiment(market_question, texts)
+    if client is not None and client.available:
+        res = client.sentiment(market_question, texts)
         if res is not None:
             return res
     # Real texts exist but there is no scorer (no API key): stay neutral rather
