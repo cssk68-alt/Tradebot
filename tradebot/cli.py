@@ -110,6 +110,14 @@ def export(out: str = typer.Option(None, help="output path for the dashboard sta
     log.info("Wrote dashboard state to %s", path)
 
 
+@app.command()
+def serve(port: int = typer.Option(8080, help="port to listen on")):
+    """Start the local dashboard + settings server at http://localhost:PORT."""
+    from tradebot.server import serve as _serve
+
+    _serve(port=port, open_browser=True)
+
+
 @app.command("derive-creds")
 def derive_creds():
     """Derive Polymarket API creds from POLYMARKET_PRIVATE_KEY (prints .env lines)."""
