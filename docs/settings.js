@@ -182,6 +182,62 @@ const SETTINGS = [
       "Kürzere Zeitfenster sind für den Bot attraktiver, weil Ereignisse besser vorhersagbar sind und Kapital schneller rotiert."
     ],
     example: "30 Tage Maximum: Ein Markt mit 90 Tagen Restlaufzeit wird übersprungen. Einer mit 25 Tagen Restlaufzeit wird analysiert."
+  },
+  {
+    key: "take_profit",
+    label: "Gewinnmitnahme (Scalp-Ziel)",
+    unit: "%",
+    min: 0.5, max: 10, step: 0.5,
+    defaultStored: 0.02,
+    isPct: true,
+    desc: [
+      "Beim Scalping schließt der Bot eine Position, sobald der Preis sich um diesen Betrag zu deinen Gunsten bewegt hat, und sichert so den kleinen Gewinn.",
+      "Ein niedriger Wert bedeutet sehr häufige, winzige Gewinne — genau die 'viele kleine Trades'-Idee, aber der Spread muss kleiner sein als dieses Ziel, sonst lohnt es sich nicht.",
+      "Höhere Werte bringen pro Trade mehr, dauern aber länger und gehen seltener auf."
+    ],
+    example: "2% Ziel: Einstieg bei 0.60, sobald der Preis 0.62 erreicht, wird verkauft. Ist der Spread 1%, bleibt nach Abzug ~1% Netto-Gewinn übrig."
+  },
+  {
+    key: "stop_loss",
+    label: "Verlustbegrenzung (Stop-Loss)",
+    unit: "%",
+    min: 0.5, max: 10, step: 0.5,
+    defaultStored: 0.03,
+    isPct: true,
+    desc: [
+      "Bewegt sich der Preis um diesen Betrag GEGEN dich, schließt der Bot die Position sofort und begrenzt so den Verlust dieses einen Trades.",
+      "Das ist die wichtigste Sicherheit beim Scalping: ein einzelner Ausreißer soll nicht die vielen kleinen Gewinne auffressen.",
+      "Ein enger Stop (kleiner Wert) verliert pro Fehltrade wenig, löst aber öfter aus; ein weiter Stop gibt dem Preis mehr Spielraum, riskiert aber mehr."
+    ],
+    example: "3% Stop: Einstieg 0.60, fällt der Preis auf 0.57, wird mit kleinem Verlust verkauft, bevor daraus ein großer Verlust wird."
+  },
+  {
+    key: "min_net_profit",
+    label: "Mindest-Netto-Gewinn nach Spread",
+    unit: "%",
+    min: 0.1, max: 3, step: 0.1,
+    defaultStored: 0.005,
+    isPct: true,
+    desc: [
+      "Dies ist der Spread-Schutz: ein Scalp wird nur eröffnet, wenn nach Abzug des Spreads mindestens dieser Gewinn übrig bleibt (Ziel minus Spread).",
+      "Märkte, deren Kauf-/Verkaufsspanne das Gewinnziel auffressen würde, werden gar nicht erst gehandelt — genau die Gefahr, die du angesprochen hast.",
+      "Höher = strenger (nur sehr enge, liquide Märkte), niedriger = mehr Trades, aber dünnere Margen."
+    ],
+    example: "0.5% Mindest-Netto bei 2% Ziel: Märkte mit Spread über 1.5% werden übersprungen, weil sonst nach Spread weniger als 0.5% übrig bliebe."
+  },
+  {
+    key: "max_hold_seconds",
+    label: "Maximale Haltedauer (Scalp)",
+    unit: " Sek.",
+    min: 30, max: 600, step: 15,
+    defaultStored: 300,
+    isPct: false,
+    desc: [
+      "Hat eine Position nach dieser Zeit weder das Gewinnziel noch den Stop-Loss erreicht, schließt der Bot sie trotzdem zum aktuellen Preis.",
+      "So bleibt Kapital nicht in lahmen Trades gebunden und rotiert schnell in neue Gelegenheiten — der Kern der 'unter 5 Minuten'-Strategie.",
+      "Kürzere Haltedauer bedeutet mehr, schnellere Trades; längere gibt dem Preis mehr Zeit, dein Ziel zu erreichen."
+    ],
+    example: "300 Sekunden (5 Min): Tut sich nach 5 Minuten nichts, wird die Position glattgestellt und das Kapital ist wieder frei für den nächsten Trade."
   }
 ];
 

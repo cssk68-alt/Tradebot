@@ -32,6 +32,7 @@ def scan():
 @app.command()
 def run(
     mode: str = typer.Option(None, help="paper | live (overrides .env)"),
+    strategy: str = typer.Option(None, help="scalp | resolve (overrides .env)"),
     loop: bool = typer.Option(False, help="run multiple cycles instead of one"),
     iterations: int = typer.Option(5, help="cycles to run with --loop"),
     interval: float = typer.Option(0.0, help="seconds to sleep between cycles"),
@@ -43,11 +44,69 @@ def run(
     s = get_settings()
     if mode:
         s.mode = mode
+    if strategy:
+        s.strategy = strategy
     orch = Orchestrator(s, log, dry_run=dry_run)
     if loop:
         orch.run_loop(iterations=iterations, interval=interval)
     else:
         orch.run_once()
+
+
+@app.command()
+def scalp(
+    minutes: float = typer.Option(30.0, help="how long to keep scalping"),
+    interval: float = typer.Option(60.0, help="seconds between cycles (poll + close)"),
+    mode: str = typer.Option(None, help="paper | live (overrides .env)"),
+):
+    """Short-horizon loop: open AND close positions within minutes at REAL prices.
+
+    Paper mode learns from real price moves (net of spread) without risking money."""
+    import time as _time
+
+    from tradebot.orchestrator import Orchestrator
+
+    s = get_settings()
+    s.strategy = "scalp"
+    if mode:
+        s.mode = mode
+    orch = Orchestrator(s, log)
+    deadline = _time.time() + minutes * 60.0
+    i = 0
+    while True:
+        i += 1
+        log.info("---- scalp cycle %d ----", i)
+        orch.run_once()
+        if _time.time() >= deadline:
+            break
+        _time.sleep(interval)
+    orch.manage_open(orch.exchange.list_markets())  # final sweep at the latest price
+
+
+@app.command()
+def reset(
+    yes: bool = typer.Option(False, "--yes", help="confirm: wipe trades/experiences/brain"),
+):
+    """Start clean: delete ALL trades, experiences, lessons and brain weights.
+
+    Use this once to drop the old simulated-outcome history before real learning."""
+    from pathlib import Path
+
+    from tradebot.store.db import Store
+
+    s = get_settings()
+    if not yes:
+        log.error("Deletes ALL trades/experiences/lessons + brain. Re-run with: reset --yes")
+        raise typer.Exit(1)
+    store = Store(s.db_path)
+    store.conn.executescript(
+        "DELETE FROM trades; DELETE FROM experiences; DELETE FROM lessons; DELETE FROM snapshots;"
+    )
+    store.conn.commit()
+    bp = Path(s.brain_path)
+    if bp.exists():
+        bp.unlink()
+    log.info("Reset complete — next run learns from real data only.")
 
 
 @app.command()

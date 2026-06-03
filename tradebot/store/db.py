@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS trades (
     market_id TEXT, token_id TEXT, question TEXT, side TEXT, is_yes INTEGER,
     entry_price REAL, size REAL, mode TEXT, status TEXT, pnl REAL,
     won INTEGER, resolved_yes INTEGER, brain_score REAL, edge REAL,
-    features TEXT, opened_at TEXT, resolved_at TEXT
+    features TEXT, opened_at TEXT, resolved_at TEXT,
+    kind TEXT DEFAULT 'resolve', exit_price REAL
 );
 CREATE TABLE IF NOT EXISTS experiences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +47,16 @@ class Store:
         self.conn = sqlite3.connect(str(db_path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(_SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a DB was first created (old DBs)."""
+        for col, ddl in (("kind", "TEXT DEFAULT 'resolve'"), ("exit_price", "REAL")):
+            try:
+                self.conn.execute(f"ALTER TABLE trades ADD COLUMN {col} {ddl}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
     # --- snapshots (for price-move anomaly detection) ---
     def last_yes_price(self, market_id: str) -> Optional[float]:
@@ -68,13 +78,14 @@ class Store:
         cur = self.conn.execute(
             """INSERT INTO trades(market_id, token_id, question, side, is_yes,
                entry_price, size, mode, status, pnl, won, resolved_yes,
-               brain_score, edge, features, opened_at, resolved_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               brain_score, edge, features, opened_at, resolved_at, kind, exit_price)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 t.market_id, t.token_id, t.question, t.side.value, int(t.is_yes),
                 t.entry_price, t.size, t.mode.value, t.status, t.pnl, _b(t.won),
                 _b(t.resolved_yes), t.brain_score, t.edge, json.dumps(t.features),
                 t.opened_at.isoformat(), t.resolved_at.isoformat() if t.resolved_at else None,
+                t.kind, t.exit_price,
             ),
         )
         self.conn.commit()
@@ -84,15 +95,17 @@ class Store:
     def update_trade(self, t: Trade) -> None:
         self.conn.execute(
             """UPDATE trades SET status=?, pnl=?, won=?, resolved_yes=?,
-               resolved_at=? WHERE id=?""",
+               resolved_at=?, kind=?, exit_price=? WHERE id=?""",
             (
                 t.status, t.pnl, _b(t.won), _b(t.resolved_yes),
-                t.resolved_at.isoformat() if t.resolved_at else None, t.id,
+                t.resolved_at.isoformat() if t.resolved_at else None,
+                t.kind, t.exit_price, t.id,
             ),
         )
         self.conn.commit()
 
     def _row_to_trade(self, r: sqlite3.Row) -> Trade:
+        keys = r.keys()
         return Trade(
             id=r["id"], market_id=r["market_id"], token_id=r["token_id"],
             question=r["question"], side=Side(r["side"]), is_yes=bool(r["is_yes"]),
@@ -104,6 +117,8 @@ class Store:
             features=json.loads(r["features"]) if r["features"] else [],
             opened_at=datetime.fromisoformat(r["opened_at"]),
             resolved_at=datetime.fromisoformat(r["resolved_at"]) if r["resolved_at"] else None,
+            kind=(r["kind"] if "kind" in keys and r["kind"] else "resolve"),
+            exit_price=(r["exit_price"] if "exit_price" in keys else None),
         )
 
     def open_trades(self, mode: Optional[Mode] = None) -> list[Trade]:

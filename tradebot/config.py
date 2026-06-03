@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     min_days_to_resolution: float = 1.0
     max_days_to_resolution: float = 30.0
 
+    # Short-horizon scalping (close within minutes at the real price, no waiting
+    # for the event). "scalp" = exit on price; "resolve" = hold to resolution.
+    strategy: str = "scalp"
+    max_hold_seconds: float = 300.0  # close a scalp after this long (5 min default)
+    take_profit: float = 0.02  # close in profit once price moved this much our way
+    stop_loss: float = 0.03  # cap the loss once price moved this much against us
+    min_net_profit: float = 0.005  # required profit AFTER spread to even open a scalp
+    min_spread_cost: float = 0.01  # floor for round-trip spread charged on a paper exit
+
     # Paths
     db_path: Path = DATA_DIR / "tradebot.db"
     brain_path: Path = DATA_DIR / "brain.npz"

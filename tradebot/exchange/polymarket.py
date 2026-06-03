@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from tradebot.exchange.base import Exchange
-from tradebot.models import Mode, Order, Trade
+from tradebot.models import Market, Mode, Order, Trade
 
 
 class PolymarketExchange(Exchange):
@@ -102,6 +102,41 @@ class PolymarketExchange(Exchange):
         trade.pnl = (
             trade.size * (1.0 - trade.entry_price) if won else -trade.size * trade.entry_price
         )
+        trade.kind = "resolve"
+        trade.status = "resolved"
+        trade.resolved_at = datetime.now(timezone.utc)
+        return trade
+
+    def close(self, trade: Trade, market: Market, reason: str = "time") -> Optional[Trade]:
+        """Scalp exit on the live book: SELL the position back at the current price.
+        dry_run logs the intended sell without sending it."""
+        cur = market.yes_price if trade.is_yes else 1.0 - market.yes_price
+        spread = max(market.spread, 0.0)
+        pnl = trade.size * (cur - trade.entry_price - spread)
+        if self.dry_run:
+            self.log.info(
+                "[DRY-RUN] would SELL to close (%s): %s %.0f sh @ %.3f (pnl %+.2f) — not sent",
+                reason, "YES" if trade.is_yes else "NO", trade.size, cur, pnl,
+            )
+        else:  # pragma: no cover - needs live deps/keys
+            client = self._client_or_none()
+            if client is not None:
+                try:
+                    from py_clob_client.clob_types import OrderArgs, OrderType
+                    from py_clob_client.order_builder.constants import SELL
+
+                    args = OrderArgs(
+                        token_id=trade.token_id, price=round(cur, 2),
+                        size=trade.size, side=SELL,
+                    )
+                    resp = client.post_order(client.create_order(args), OrderType.GTC)
+                    self.log.info("Live SELL posted (%s): %s", reason, resp)
+                except Exception as e:
+                    self.log.error("Live close failed: %s", e)
+        trade.exit_price = round(cur, 4)
+        trade.pnl = pnl
+        trade.won = pnl > 0
+        trade.kind = "scalp"
         trade.status = "resolved"
         trade.resolved_at = datetime.now(timezone.utc)
         return trade

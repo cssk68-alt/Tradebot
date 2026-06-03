@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from tradebot.agents.postmortem import PostmortemAgent
@@ -57,38 +58,81 @@ class Orchestrator:
     def bankroll(self) -> float:
         return self.settings.bankroll + self.store.realized_pnl(self.mode)
 
+    def _record_resolved(self, r) -> None:
+        self.store.update_trade(r)
+        self.store.save_experience(
+            Experience(
+                features=r.features, edge=r.edge, size=r.size, brain_score=r.brain_score,
+                won=bool(r.won), pnl=r.pnl, mode=r.mode,
+            )
+        )
+
+    def _after_resolved(self, resolved, verb: str) -> None:
+        if not resolved:
+            return
+        wins = sum(1 for r in resolved if r.won)
+        self.log.info(
+            "%s %d trades (%d net-positive) pnl %.2f", verb, len(resolved), wins,
+            sum(r.pnl for r in resolved),
+        )
+        self.postmortem.run(resolved)
+        self._train_models()  # brain + predictor learn; carries over to live mode
+
     def settle_open(self):
+        """Hold-to-event settlement (the `settle` poller) — REAL resolution, no dice."""
         resolved = []
         for t in self.store.open_trades(self.mode):
             r = self.exchange.settle(t)
-            if r is None:
-                continue
-            self.store.update_trade(r)
-            self.store.save_experience(
-                Experience(
-                    features=r.features, edge=r.edge, size=r.size, brain_score=r.brain_score,
-                    won=bool(r.won), pnl=r.pnl, mode=r.mode,
-                )
-            )
-            resolved.append(r)
-        if resolved:
-            wins = sum(1 for r in resolved if r.won)
-            self.log.info(
-                "Settled %d trades (%d wins) pnl %.2f", len(resolved), wins,
-                sum(r.pnl for r in resolved),
-            )
-            self.postmortem.run(resolved)
-            self._train_models()  # brain + predictor learn; carries over to live mode
+            if r is not None:
+                self._record_resolved(r)
+                resolved.append(r)
+        self._after_resolved(resolved, "Settled")
+        return resolved
+
+    def _scalp_trigger(self, t, market) -> Optional[str]:
+        opened = t.opened_at if t.opened_at.tzinfo else t.opened_at.replace(tzinfo=timezone.utc)
+        held = (datetime.now(timezone.utc) - opened).total_seconds()
+        cur = market.yes_price if t.is_yes else 1.0 - market.yes_price
+        move = cur - t.entry_price
+        if move >= self.settings.take_profit:
+            return "take_profit"
+        if move <= -self.settings.stop_loss:
+            return "stop_loss"
+        if held >= self.settings.max_hold_seconds:
+            return "time"
+        return None
+
+    def manage_open(self, markets=None):
+        """Close/settle open trades against FRESH prices.
+        scalp  -> exit on price (take-profit / stop-loss / max hold);
+        resolve -> settle from the real resolution."""
+        by_id = {m.id: m for m in (markets or [])}
+        resolved = []
+        for t in self.store.open_trades(self.mode):
+            if self.settings.strategy == "scalp":
+                m = by_id.get(t.market_id)
+                if m is None:
+                    continue  # no current price -> leave open
+                reason = self._scalp_trigger(t, m)
+                if reason is None:
+                    continue
+                r = self.exchange.close(t, m, reason=reason)
+            else:
+                r = self.exchange.settle(t)
+            if r is not None:
+                self._record_resolved(r)
+                resolved.append(r)
+        self._after_resolved(resolved, "Closed")
         return resolved
 
     # --- main cycle ---
     def run_once(self):
         self.log.info(
-            "=== Cycle start (mode=%s, bankroll=%.2f, brain_trained=%s) ===",
-            self.mode.value, self.bankroll(), self.brain.trained,
+            "=== Cycle start (mode=%s, strategy=%s, bankroll=%.2f, brain_trained=%s) ===",
+            self.mode.value, self.settings.strategy, self.bankroll(), self.brain.trained,
         )
-        self.settle_open()
         markets = self.exchange.list_markets()
+        self.manage_open(markets)
         candidates = self.scan.run(markets)
         reports = self.research.run(candidates)
         signals = self.predict.run(candidates, reports)

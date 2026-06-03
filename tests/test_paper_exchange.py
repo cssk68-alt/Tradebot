@@ -4,7 +4,7 @@ from tradebot.config import Settings
 from tradebot.data.gamma import GammaClient
 from tradebot.exchange.paper import PaperExchange
 from tradebot.log import get_logger
-from tradebot.models import Mode, Order, Side
+from tradebot.models import Market, Mode, Order, Side
 
 
 def _ex(tmp):
@@ -20,6 +20,10 @@ def _order(price=0.4, is_yes=True):
     )
 
 
+def _market(yes=0.4, bid=0.395, ask=0.405):
+    return Market(id="m", question="q", yes_price=yes, best_bid=bid, best_ask=ask)
+
+
 def test_paper_fill_is_open_at_price(tmp_path):
     tr = _ex(tmp_path).place_order(_order())
     assert tr.status == "open"
@@ -28,18 +32,47 @@ def test_paper_fill_is_open_at_price(tmp_path):
 
 
 def test_paper_settle_win_pnl(tmp_path):
+    # hold-to-event settlement uses the REAL resolution (here forced for the test)
     ex = _ex(tmp_path)
     tr = ex.place_order(_order())
-    tr.features = [0.4] + [0.0] * 9
     r = ex.settle(tr, force_yes=True)
-    assert r.status == "resolved" and r.won is True
+    assert r.status == "resolved" and r.won is True and r.kind == "resolve"
     assert abs(r.pnl - 100 * (1 - 0.4)) < 1e-6
 
 
 def test_paper_settle_loss_pnl(tmp_path):
     ex = _ex(tmp_path)
     tr = ex.place_order(_order())
-    tr.features = [0.4] + [0.0] * 9
     r = ex.settle(tr, force_yes=False)
     assert r.won is False
     assert abs(r.pnl + 100 * 0.4) < 1e-6
+
+
+def test_scalp_close_profit_net_of_spread(tmp_path):
+    # entry 0.40, price moved to 0.45, tight spread 0.004 -> floored to min 0.01
+    ex = _ex(tmp_path)
+    tr = ex.place_order(_order(price=0.40))
+    r = ex.close(tr, _market(yes=0.45, bid=0.448, ask=0.452), reason="take_profit")
+    assert r.status == "resolved" and r.kind == "scalp" and r.won is True
+    # 100 * (0.45 - 0.40 - 0.01) = 4.0
+    assert abs(r.pnl - 4.0) < 1e-6
+    assert r.exit_price == 0.45
+
+
+def test_scalp_flat_price_loses_the_spread(tmp_path):
+    # price unchanged -> you still pay the round-trip spread (0.01) => small loss
+    ex = _ex(tmp_path)
+    tr = ex.place_order(_order(price=0.40))
+    r = ex.close(tr, _market(yes=0.40, bid=0.395, ask=0.405), reason="time")
+    assert r.won is False
+    assert abs(r.pnl + 1.0) < 1e-6  # 100 * (0 - 0.01)
+
+
+def test_scalp_no_side_uses_complement_price(tmp_path):
+    # NO position: token price = 1 - yes_price. entry 0.60 (NO), yes drops 0.45->0.40
+    # so NO price rises 0.55 -> 0.60; flat-ish move, spread floor applies
+    ex = _ex(tmp_path)
+    tr = ex.place_order(_order(price=0.55, is_yes=False))
+    r = ex.close(tr, _market(yes=0.40, bid=0.398, ask=0.402), reason="take_profit")
+    # NO price now 1 - 0.40 = 0.60; pnl = 100*(0.60 - 0.55 - 0.01) = 4.0
+    assert r.won is True and abs(r.pnl - 4.0) < 1e-6

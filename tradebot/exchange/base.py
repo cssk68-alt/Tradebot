@@ -30,3 +30,8 @@ class Exchange(ABC):
     def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:
         """Resolve an open trade if its market has resolved. Returns the resolved
         Trade (status='resolved', pnl/won set) or None if still open."""
+
+    @abstractmethod
+    def close(self, trade: Trade, market: Market, reason: str = "time") -> Optional[Trade]:
+        """Scalp exit: close (sell) an open position at the market's CURRENT price.
+        Returns the closed Trade with realized, net-of-spread pnl/won set."""

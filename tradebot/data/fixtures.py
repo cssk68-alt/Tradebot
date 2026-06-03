@@ -6,15 +6,17 @@ from datetime import datetime, timedelta, timezone
 from tradebot.models import Market
 
 # (id, question, yes_price, volume_24h, liquidity, days_to_res, best_bid, best_ask)
+# Tight-spread (1c) markets are scalp-tradeable; wide-spread ones are intentionally
+# rejected by the net-of-spread entry filter so the gate is visible offline too.
 _RAW = [
-    ("btc-100k", "Will Bitcoin close above $100k this month?", 0.62, 250000, 8000, 12, 0.61, 0.63),
+    ("btc-100k", "Will Bitcoin close above $100k this month?", 0.62, 250000, 8000, 12, 0.615, 0.625),
     ("eth-etf", "Will a spot ETH ETF see >$1B inflows in 30 days?", 0.41, 90000, 5200, 21, 0.39, 0.43),
-    ("fed-cut", "Will the Fed cut rates at the next meeting?", 0.73, 410000, 15000, 7, 0.72, 0.74),
-    ("elec-x", "Will candidate X win the upcoming election?", 0.52, 1200000, 42000, 25, 0.51, 0.53),
+    ("fed-cut", "Will the Fed cut rates at the next meeting?", 0.73, 410000, 15000, 7, 0.725, 0.735),
+    ("elec-x", "Will candidate X win the upcoming election?", 0.52, 1200000, 42000, 25, 0.515, 0.525),
     ("ai-model", "Will a new frontier AI model launch this month?", 0.68, 60000, 3100, 14, 0.64, 0.71),
-    ("sports-y", "Will team Y reach the finals?", 0.34, 175000, 6400, 18, 0.32, 0.36),
+    ("sports-y", "Will team Y reach the finals?", 0.34, 175000, 6400, 18, 0.335, 0.345),
     ("weather-z", "Will it be the hottest month on record?", 0.58, 22000, 1500, 9, 0.55, 0.62),
-    ("rate-hold", "Will unemployment stay below 4.5% next report?", 0.81, 130000, 9800, 5, 0.80, 0.82),
+    ("rate-hold", "Will unemployment stay below 4.5% next report?", 0.81, 130000, 9800, 5, 0.805, 0.815),
 ]
 
 

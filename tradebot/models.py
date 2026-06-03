@@ -107,9 +107,11 @@ class Trade(BaseModel):
     mode: Mode
     is_yes: bool = True
     status: str = "open"  # "open" | "resolved"
+    kind: str = "resolve"  # "resolve" = hold to event; "scalp" = close on price
     pnl: float = 0.0
     won: Optional[bool] = None
     resolved_yes: Optional[bool] = None
+    exit_price: Optional[float] = None  # price we closed at (scalp exits)
     brain_score: float = 0.5
     edge: float = 0.0
     features: list[float] = Field(default_factory=list)

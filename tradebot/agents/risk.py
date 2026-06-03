@@ -41,6 +41,7 @@ class RiskAgent(Agent):
             trade.features = sig.features
             trade.edge = sig.edge
             trade.brain_score = sig.brain_score
+            trade.kind = "scalp" if self.settings.strategy == "scalp" else "resolve"
             self.store.save_trade(trade)
             exposure += decision.amount
             placed.append(trade)

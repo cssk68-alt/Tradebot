@@ -1,24 +1,25 @@
-"""Simulated exchange — fills paper orders at the market price and simulates
-resolution. The paper-mode outcome has a latent YES probability that depends on
-sentiment (a learnable information edge), so the full learning loop runs without
-real money or waiting days for settlement."""
+"""Paper exchange — NO simulated outcomes.
+
+Fills paper orders at the real market price, and resolves them from REAL data:
+  - scalp exit  (`close`):  realized pnl from the market's CURRENT price, net of spread
+  - hold to event (`settle`): the REAL Gamma resolution (paper-with-real-settlement)
+
+So the brain learns from real price behaviour / real resolutions — only the money
+is simulated, never the outcome.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
-import numpy as np
-
 from tradebot.exchange.base import Exchange
-from tradebot.ml.features import PRICE_IDX, SENTIMENT_IDX
-from tradebot.models import Mode, Order, Trade
+from tradebot.models import Market, Mode, Order, Trade
 
 
 class PaperExchange(Exchange):
-    def __init__(self, gamma, log, settings, seed: int = 12345):
+    def __init__(self, gamma, log, settings):
         super().__init__(gamma, log)
         self.settings = settings
-        self.rng = np.random.default_rng(seed)
 
     @property
     def mode(self) -> Mode:
@@ -34,21 +35,36 @@ class PaperExchange(Exchange):
         )
 
     def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:
-        yes_outcome = bool(force_yes) if force_yes is not None else self._simulate_yes(trade)
-        won = yes_outcome if trade.is_yes else (not yes_outcome)
-        trade.resolved_yes = yes_outcome
+        """Hold-to-event: settle from the REAL Gamma resolution (None if not resolved yet)."""
+        res = force_yes if force_yes is not None else self.gamma.get_resolution(trade.market_id)
+        if res is None:
+            return None
+        won = bool(res) if trade.is_yes else (not bool(res))
+        trade.resolved_yes = bool(res)
         trade.won = won
         trade.pnl = (
             trade.size * (1.0 - trade.entry_price) if won else -trade.size * trade.entry_price
         )
+        trade.kind = "resolve"
         trade.status = "resolved"
         trade.resolved_at = datetime.now(timezone.utc)
         return trade
 
-    def _simulate_yes(self, trade: Trade) -> bool:
-        feats = trade.features or []
-        yes_price = feats[PRICE_IDX] if feats else 0.5
-        sentiment = feats[SENTIMENT_IDX] if len(feats) > SENTIMENT_IDX else 0.0
-        latent = yes_price + 0.25 * sentiment + float(self.rng.normal(0.0, 0.05))
-        latent = min(0.98, max(0.02, latent))
-        return bool(self.rng.random() < latent)
+    def close(self, trade: Trade, market: Market, reason: str = "time") -> Optional[Trade]:
+        """Scalp exit: realize pnl from the market's CURRENT price, charging the
+        round-trip spread (buy at ask, sell at bid). Flat price => small spread loss."""
+        cur = market.yes_price if trade.is_yes else 1.0 - market.yes_price
+        spread = max(market.spread, self.settings.min_spread_cost)
+        pnl = trade.size * (cur - trade.entry_price - spread)
+        trade.exit_price = round(cur, 4)
+        trade.pnl = pnl
+        trade.won = pnl > 0
+        trade.kind = "scalp"
+        trade.status = "resolved"
+        trade.resolved_at = datetime.now(timezone.utc)
+        self.log.info(
+            "Paper close (%s): %s %.0f sh  %.3f -> %.3f  spread %.3f  pnl %+.2f",
+            reason, "YES" if trade.is_yes else "NO", trade.size,
+            trade.entry_price, cur, spread, pnl,
+        )
+        return trade

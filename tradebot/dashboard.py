@@ -16,7 +16,9 @@ def _trade_dict(t: Trade) -> dict:
     return {
         "question": t.question,
         "side": "YES" if t.is_yes else "NO",
+        "kind": getattr(t, "kind", "resolve"),
         "entry": round(t.entry_price, 3),
+        "exit": round(t.exit_price, 3) if t.exit_price is not None else None,
         "size": round(t.size, 1),
         "edge": round(t.edge, 3),
         "brain": round(t.brain_score, 3),

@@ -50,6 +50,15 @@ class PredictAgent(Agent):
             else:
                 continue  # no actionable edge
 
+            # Scalping: the spread is paid round-trip, so only enter where the
+            # take-profit target still clears the spread by min_net_profit.
+            if s.strategy == "scalp" and m.spread > s.take_profit - s.min_net_profit:
+                self.log.info(
+                    "Predict: skip '%s' — spread %.3f eats target %.3f",
+                    m.question[:40], m.spread, s.take_profit,
+                )
+                continue
+
             confidence = min(
                 1.0,
                 max(0.0, 0.5 + 2.0 * min(abs(edge), 0.25) + 0.3 * (brain_score - 0.5) + llm_bump),

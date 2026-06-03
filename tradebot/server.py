@@ -30,6 +30,11 @@ DEFAULTS: dict = {
     "max_slippage": 0.02,
     "min_days_to_resolution": 1.0,
     "max_days_to_resolution": 30.0,
+    # short-horizon scalping
+    "max_hold_seconds": 300.0,
+    "take_profit": 0.02,
+    "stop_loss": 0.03,
+    "min_net_profit": 0.005,
 }
 
 
