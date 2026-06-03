@@ -19,6 +19,20 @@ class Brain:
 
     def train_from_experiences(self, experiences: list[Experience]) -> bool:
         X, y = to_xy(experiences)
+        # Guard against feature-schema drift: experiences saved under an older,
+        # narrower feature set produce shorter rows than the current net expects.
+        # Drop the incompatible rows instead of crashing, so growing the feature
+        # set never breaks a running cycle (old rows simply stop contributing).
+        dim = self.net.input_dim
+        compat = [(xi, yi) for xi, yi in zip(X, y) if len(xi) == dim]
+        if len(compat) < len(X):
+            self.log.info(
+                "Brain: skipped %d experience(s) from an older feature schema "
+                "(net expects %d-dim); %d compatible remain.",
+                len(X) - len(compat), dim, len(compat),
+            )
+        X = [xi for xi, _ in compat]
+        y = [yi for _, yi in compat]
         if self.net.train(X, y):
             self.net.save(self.path)
             wins = sum(y)

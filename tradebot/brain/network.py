@@ -46,6 +46,8 @@ class NeuralBrain:
         if len(y) < 8 or len(set(y)) < 2:
             return False
         Xa = np.array(X, dtype=float)
+        if Xa.ndim != 2 or Xa.shape[1] != self.input_dim:
+            return False  # feature-schema drift -> refuse rather than matmul-crash
         ya = np.array(y, dtype=float).reshape(-1, 1)
         self.mu = Xa.mean(axis=0)
         self.sd = Xa.std(axis=0) + 1e-6
@@ -125,6 +127,8 @@ class TorchBrain:
             return False
         t = self.torch
         Xa = np.array(X, dtype=float)
+        if Xa.ndim != 2 or Xa.shape[1] != self.input_dim:
+            return False  # feature-schema drift -> refuse rather than crash
         self.mu = Xa.mean(axis=0)
         self.sd = Xa.std(axis=0) + 1e-6
         xt = t.tensor(self._norm(Xa), dtype=t.float32)

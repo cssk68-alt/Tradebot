@@ -2,6 +2,33 @@
 
 Stand: 2026-06-03 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
+## Live-Verifikation mit Netz + DeepSeek (neu, 2026-06-03)
+
+Erstmals mit Internet + echtem DeepSeek-Key getestet (`LLM_PROVIDER=deepseek`,
+`DEEPSEEK_MODEL=deepseek-chat` = die schnelle, **nicht-denkende** Variante;
+`deepseek-reasoner` wäre die denkende).
+
+- **DeepSeek-Smoke-Test bestanden** — der Vorbehalt aus `ERKENNTNISSE` ist aufgelöst:
+  Raw-`POST /chat/completions` → `200`, Response-Form `choices[0].message.content`
+  bestätigt; `sentiment()` auf echten RSS-Schlagzeilen → `(-0.85, "...outflows...")`.
+  Modell-Echo `deepseek-v4-flash`, `reasoning_content=False`.
+- **Daten-Layer:** Gamma **200** (300 Märkte, Scan ~44-49 passen die Filter);
+  RSS ✅ 8 Schlagzeilen; Reddit ⚠️ **403** (Reddit verlangt inzwischen OAuth — der
+  öffentliche `.json`-Search ist dicht; Code degradiert sauber auf `[]`).
+- **Bugfix — Brain Feature-Schema-Drift:** alte Experiences/Trades (10-dim Features
+  aus dem Schema *vor* den 5 quellengetrennten Signalen) crashten das 17-dim-Netz
+  (`matmul 12≠17`). Fix (nicht-destruktiv): `Brain.train_from_experiences` filtert
+  Zeilen ≠ `net.input_dim` (mit Log), und `NeuralBrain/TorchBrain.train` verweigern
+  einen Breiten-Mismatch statt zu crashen. Eine Schema-Erweiterung bricht damit nie
+  mehr einen laufenden Zyklus.
+- **Paper-Zyklus End-to-End grün:** `research → predict → BrainManager → risk` mit
+  DeepSeek; der BrainManager liefert echte Vetos/Approves (1/3 approved); 0 Trades,
+  weil das Risk-Gate den approved Trade bei Confidence < Threshold zurückhielt
+  (korrektes Verhalten, kein Bug).
+- **Tests:** 71 passed, 1 skipped (Python 3.14.5).
+- **Offen:** optional `reset --yes` entsorgt die 18 inkompatiblen Alt-Trades (10-dim);
+  längerer Paper-/Scalp-Lauf (B-3); UI-Vorschau (Punkt 7); Polymarket-Live (B-4).
+
 ## Provider-agnostischer LLM-Client + Agent-Pflicht (neu, 2026-06-03)
 
 Option B umgesetzt: der LLM-Zugriff läuft jetzt über eine **provider-agnostische
