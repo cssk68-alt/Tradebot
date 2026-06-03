@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     polymarket_api_secret: str = ""
     polymarket_api_passphrase: str = ""
 
+    # Research data feeds (all optional & free; blank = that feed is simply off).
+    # CoinGecko (crypto price) and GDELT (news) need no key and always work.
+    tavily_api_key: str = ""  # web search via api.tavily.com (else DuckDuckGo/GDELT)
+    odds_api_key: str = ""  # the-odds-api.com — real bookmaker odds for sports
+    reddit_client_id: str = ""  # OAuth (free Reddit app, gratis)
+    reddit_client_secret: str = ""
+
     # Strategy knobs
     kelly_fraction: float = 0.25
     max_trade_pct: float = 0.05

@@ -24,6 +24,8 @@ FEATURE_NAMES = [
     # source-separated research signals
     "rss_sentiment", "reddit_sentiment", "rss_log_sources", "reddit_log_sources",
     "source_quality",
+    # web search + hard-fact prior (live crypto price / bookmaker odds)
+    "web_sentiment", "web_log_sources", "fact_prob", "fact_confidence",
 ]
 FEATURE_DIM = len(FEATURE_NAMES)
 
@@ -47,6 +49,10 @@ def build_features(
     rss_sources = report.rss_sources if report else 0
     reddit_sources = report.reddit_sources if report else 0
     source_quality = report.source_quality if report else 0.0
+    web_sentiment = report.web_sentiment if report else 0.0
+    web_sources = report.web_sources if report else 0
+    fact_prob = report.fact_prob if (report and report.fact_prob is not None) else 0.5
+    fact_confidence = report.fact_confidence if report else 0.0
     days = market.days_to_resolution()
     return [
         market.yes_price,
@@ -64,6 +70,10 @@ def build_features(
         math.log1p(max(0, rss_sources)) / 4.0,
         math.log1p(max(0, reddit_sources)) / 4.0,
         source_quality,
+        web_sentiment,
+        math.log1p(max(0, web_sources)) / 4.0,
+        fact_prob,
+        fact_confidence,
     ]
 
 

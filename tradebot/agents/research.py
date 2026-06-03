@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 
 from tradebot.agents.base import Agent
-from tradebot.data import reddit, rss, sentiment
+from tradebot.data import facts, reddit, rss, sentiment, websearch
 from tradebot.models import Candidate, ResearchReport
 
 
@@ -23,28 +23,46 @@ class ResearchAgent(Agent):
 
     async def _one(self, c: Candidate) -> ResearchReport:
         q = c.market.question
-        rss_texts, reddit_texts = await asyncio.gather(
+        s = self.settings
+        rss_texts, reddit_texts, web_texts, fact = await asyncio.gather(
             asyncio.to_thread(rss.fetch_headlines, q),
-            asyncio.to_thread(reddit.search_reddit, q),
+            asyncio.to_thread(reddit.search_reddit, q, s.reddit_client_id, s.reddit_client_secret),
+            asyncio.to_thread(websearch.search, q, s.tavily_api_key),
+            asyncio.to_thread(facts.best_fact, q, s.odds_api_key),
         )
         rss_score, rss_narr = await asyncio.to_thread(sentiment.analyze, rss_texts, q, self.client)
         reddit_score, reddit_narr = await asyncio.to_thread(
             sentiment.analyze, reddit_texts, q, self.client
         )
-        n_rss, n_reddit = len(rss_texts), len(reddit_texts)
-        total = n_rss + n_reddit
-        score = (rss_score * n_rss + reddit_score * n_reddit) / total if total else 0.0
+        web_score, web_narr = await asyncio.to_thread(
+            sentiment.analyze, web_texts, q, self.client
+        )
+        n_rss, n_reddit, n_web = len(rss_texts), len(reddit_texts), len(web_texts)
+        total = n_rss + n_reddit + n_web
+        score = (
+            (rss_score * n_rss + reddit_score * n_reddit + web_score * n_web) / total
+            if total else 0.0
+        )
+        narrative = f"RSS: {rss_narr} | Reddit: {reddit_narr} | Web: {web_narr}"
+        if fact is not None:
+            narrative = f"FACT: {fact.text} | " + narrative
         return ResearchReport(
             market_id=c.market.id,
             sentiment=score,
-            narrative=f"RSS: {rss_narr} | Reddit: {reddit_narr}",
+            narrative=narrative,
             n_sources=total,
             implied_prob=c.market.yes_price,
             rss_sentiment=rss_score,
             reddit_sentiment=reddit_score,
             rss_sources=n_rss,
             reddit_sources=n_reddit,
+            web_sentiment=web_score,
+            web_sources=n_web,
             source_quality=min(1.0, total / 8.0),
+            fact_prob=(fact.prob if fact is not None else None),
+            fact_confidence=(fact.confidence if fact is not None else 0.0),
+            fact_text=(fact.text if fact is not None else ""),
+            fact_source=(fact.source if fact is not None else ""),
         )
 
     async def _run_async(self, candidates: list[Candidate]) -> dict[str, ResearchReport]:

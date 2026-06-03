@@ -31,7 +31,7 @@ class PredictAgent(Agent):
             # external research. No sources -> no trade (no synthetic/offline-prior
             # edges). Paper is held to the exact same bar as live, so a paper track
             # record is meaningful and transfers 1:1 to real money.
-            if report is None or report.n_sources == 0:
+            if report is None or (report.n_sources == 0 and report.fact_prob is None):
                 self.log.info(
                     "Predict: skip '%s' — no external research sources", m.question[:40]
                 )
@@ -49,6 +49,16 @@ class PredictAgent(Agent):
                     llm_prob, llm_conf, reason = est
                     true_prob = 0.5 * model_prob + 0.5 * llm_prob
                     llm_bump = 0.15 * (llm_conf - 0.5)
+
+            # Fold in a hard quantitative prior (live crypto price / bookmaker
+            # odds) weighted by its confidence — a calibrated number anchoring the
+            # fuzzy text estimate. It is already in the narrative (the forecaster
+            # saw it); this also nudges the math side directly.
+            if report.fact_prob is not None:
+                w = 0.5 * max(0.0, min(1.0, report.fact_confidence))
+                true_prob = (1.0 - w) * true_prob + w * report.fact_prob
+                if reason == "model":
+                    reason = f"fact:{report.fact_source}"
 
             if true_prob >= m.yes_price + s.edge_threshold:
                 is_yes, price, token = True, m.yes_price, m.yes_token_id

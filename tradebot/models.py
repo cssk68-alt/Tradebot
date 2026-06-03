@@ -90,7 +90,15 @@ class ResearchReport(BaseModel):
     reddit_sentiment: float = 0.0
     rss_sources: int = 0
     reddit_sources: int = 0
+    web_sentiment: float = 0.0
+    web_sources: int = 0
     source_quality: float = 0.0  # 0..1 confidence in the research depth
+    # Hard quantitative prior from a live fact feed (crypto price / sports odds).
+    # ``fact_prob`` is a calibrated P(YES); None means no applicable fact found.
+    fact_prob: Optional[float] = None
+    fact_confidence: float = 0.0  # 0..1 trust in the fact prior
+    fact_text: str = ""  # human-readable fact, also injected into the narrative
+    fact_source: str = ""  # "coingecko" | "odds-api" | ""
 
 
 class Signal(BaseModel):
