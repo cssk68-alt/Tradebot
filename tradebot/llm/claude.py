@@ -14,6 +14,11 @@ DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
 
 class AnthropicClient(LLMClient):
+    # Approximate Claude Haiku 4.5 pricing, EUR per token (input ~$1/1M, output
+    # ~$5/1M, USD->EUR ~0.92) — only used when LLM_PROVIDER=anthropic.
+    PRICE_IN_EUR = 1.0 / 1_000_000 * 0.92
+    PRICE_OUT_EUR = 5.0 / 1_000_000 * 0.92
+
     def __init__(self, api_key: str = "", model: str = DEFAULT_MODEL):
         self.model = model
         self._client = None
@@ -39,6 +44,9 @@ class AnthropicClient(LLMClient):
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": user}],
             )
+            u = getattr(msg, "usage", None)
+            if u is not None:
+                self._add_usage(getattr(u, "input_tokens", 0), getattr(u, "output_tokens", 0))
             return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
         except Exception:
             return None

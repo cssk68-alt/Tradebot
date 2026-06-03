@@ -130,8 +130,9 @@ async function _postJSON(path, body) {
 function renderRunStatus(st) {
   const badge = $("runStatus");
   const running = !!(st && st.running);
+  const eur = st && st.cost ? ` · €${Number(st.cost).toFixed(4)}` : "";
   badge.textContent = running
-    ? `running · ${st.mode} · Zyklus ${st.cycle}`
+    ? `running · ${st.mode} · Zyklus ${st.cycle}${eur}`
     : (st && st.error ? "Fehler" : "idle");
   badge.className = "badge " + (running ? (st.mode === "live" ? "live" : "paper") : "");
   const start = $("startBtn"), stop = $("stopBtn");
@@ -139,7 +140,10 @@ function renderRunStatus(st) {
   stop.disabled = !running;
   start.style.opacity = running ? 0.5 : 1;
   stop.style.opacity = running ? 1 : 0.5;
-  $("runMsg").textContent = (st && st.error) ? "⚠ " + st.error : (st && st.last) || "";
+  $("runMsg").textContent = (st && st.error)
+    ? "⚠ " + st.error
+    : (st && st.stop_reason && !running) ? "Gestoppt: " + st.stop_reason
+    : (st && st.last) || "";
 }
 
 async function pollStatus() {
@@ -164,10 +168,21 @@ function wireControls() {
   modeSel.addEventListener("change", () => {
     $("liveGuard").hidden = modeSel.value !== "live";
   });
+  const eur = $("maxEur"), rt = $("maxRuntime");
+  const showEur = () => ($("eurOut").textContent = +eur.value === 0 ? "aus" : "€" + (+eur.value).toFixed(2));
+  const showRt = () => ($("rtOut").textContent = +rt.value === 0 ? "aus" : +rt.value + " min");
+  eur.addEventListener("input", showEur);
+  rt.addEventListener("input", showRt);
+  showEur();
+  showRt();
   $("startBtn").addEventListener("click", async () => {
     const mode = modeSel.value;
     const interval = parseFloat($("runInterval").value) || 60;
-    const body = { mode, strategy: "scalp", interval };
+    const body = {
+      mode, strategy: "scalp", interval,
+      max_eur: parseFloat($("maxEur").value) || 0,
+      max_runtime: (parseFloat($("maxRuntime").value) || 0) * 60, // min -> sec
+    };
     if (mode === "live") {
       if (!$("liveAck").checked || $("liveConfirm").value.trim() !== "LIVE") {
         $("runMsg").textContent = "Live abgebrochen: Häkchen setzen und LIVE eintippen.";

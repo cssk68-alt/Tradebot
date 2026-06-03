@@ -23,6 +23,12 @@ DEFAULT_BASE_URL = "https://api.deepseek.com"
 
 
 class DeepSeekClient(LLMClient):
+    # deepseek-v4-flash pricing (what deepseek-chat maps to), EUR per token. Input
+    # at the cache-MISS rate ($0.14/1M) for a conservative cap; output $0.28/1M;
+    # USD->EUR ~0.92. Source: api-docs.deepseek.com/quick_start/pricing
+    PRICE_IN_EUR = 0.14 / 1_000_000 * 0.92
+    PRICE_OUT_EUR = 0.28 / 1_000_000 * 0.92
+
     def __init__(
         self,
         api_key: str = "",
@@ -63,6 +69,8 @@ class DeepSeekClient(LLMClient):
             )
             r.raise_for_status()
             data = r.json()
+            u = data.get("usage") or {}
+            self._add_usage(u.get("prompt_tokens"), u.get("completion_tokens"))
             return data["choices"][0]["message"]["content"]
         except Exception:
             return None

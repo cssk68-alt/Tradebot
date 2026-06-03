@@ -84,6 +84,10 @@ class _Runner:
         self.last = ""
         self.error = ""
         self.started_at = ""
+        self.cost = 0.0
+        self.max_eur = 0.0
+        self.max_runtime = 0.0
+        self.stop_reason = ""
 
     @property
     def running(self) -> bool:
@@ -93,10 +97,13 @@ class _Runner:
         return {
             "running": self.running, "mode": self.mode, "strategy": self.strategy,
             "cycle": self.cycle, "last": self.last, "error": self.error,
-            "started_at": self.started_at,
+            "started_at": self.started_at, "cost": round(self.cost, 4),
+            "max_eur": self.max_eur, "max_runtime": self.max_runtime,
+            "stop_reason": self.stop_reason,
         }
 
-    def start(self, mode: str, strategy: str, interval: float, confirm: str) -> dict:
+    def start(self, mode: str, strategy: str, interval: float, confirm: str,
+              max_eur: float = 0.0, max_runtime: float = 0.0) -> dict:
         with self._lock:
             if self.running:
                 return {"ok": False, "error": "läuft bereits"}
@@ -108,7 +115,10 @@ class _Runner:
             self._stop.clear()
             self.mode, self.strategy = mode, strategy or "scalp"
             self.interval = max(5.0, float(interval))
-            self.cycle, self.last, self.error = 0, "", ""
+            self.max_eur = max(0.0, float(max_eur))         # 0 = unbegrenzt
+            self.max_runtime = max(0.0, float(max_runtime))  # seconds, 0 = unbegrenzt
+            self.cycle, self.last, self.error, self.stop_reason = 0, "", "", ""
+            self.cost = 0.0
             import time as _t
 
             self.started_at = _t.strftime("%H:%M:%S")
@@ -122,6 +132,8 @@ class _Runner:
 
     def _loop(self) -> None:
         try:
+            import time as _t
+
             from tradebot.config import get_settings
             from tradebot.log import get_logger
             from tradebot.orchestrator import Orchestrator
@@ -133,10 +145,19 @@ class _Runner:
             # so the background loop is not blocked on stdin. Paper ignores confirm.
             confirm = (lambda order: True) if self.mode == "live" else None
             orch = Orchestrator(s, log, confirm=confirm)
+            deadline = (_t.time() + self.max_runtime) if self.max_runtime else None
             while not self._stop.is_set():
+                # Stop on whichever cap is hit first, BEFORE starting a new cycle.
+                if deadline and _t.time() >= deadline:
+                    self.stop_reason = f"Laufzeit-Limit erreicht ({self.max_runtime / 60:.0f} min)"
+                    break
+                if self.max_eur and self.cost >= self.max_eur:
+                    self.stop_reason = f"Budget erreicht (€{self.cost:.4f} >= €{self.max_eur:.2f})"
+                    break
                 self.cycle += 1
                 placed = orch.run_once()
-                self.last = f"Zyklus {self.cycle}: {len(placed)} Trade(s) platziert"
+                self.cost = orch.client.cost_eur
+                self.last = f"Zyklus {self.cycle}: {len(placed)} Trade(s), €{self.cost:.4f}"
                 self._stop.wait(self.interval)
             try:
                 orch.manage_open(orch.exchange.list_markets())  # final sweep on stop
@@ -182,6 +203,7 @@ class _Handler(SimpleHTTPRequestHandler):
             self._json(RUNNER.start(
                 d.get("mode", "paper"), d.get("strategy", "scalp"),
                 d.get("interval", 60.0), d.get("confirm", ""),
+                d.get("max_eur", 0.0), d.get("max_runtime", 0.0),
             ))
         elif self.path == "/api/stop":
             self._json(RUNNER.stop())

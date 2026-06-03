@@ -29,6 +29,23 @@ class LLMUnavailableError(RuntimeError):
 class LLMClient(ABC):
     """Abstract LLM agent. Subclass and implement ``available`` + ``_complete``."""
 
+    # Token pricing in EUR per token (0 = unknown). Providers override these and
+    # call ``_add_usage`` inside ``_complete`` so a run can be capped by a budget.
+    PRICE_IN_EUR: float = 0.0
+    PRICE_OUT_EUR: float = 0.0
+
+    def _add_usage(self, prompt_tokens, completion_tokens) -> None:
+        self.prompt_tokens = getattr(self, "prompt_tokens", 0) + int(prompt_tokens or 0)
+        self.completion_tokens = getattr(self, "completion_tokens", 0) + int(completion_tokens or 0)
+
+    @property
+    def cost_eur(self) -> float:
+        """Accumulated spend in EUR since this client was created."""
+        return (
+            getattr(self, "prompt_tokens", 0) * self.PRICE_IN_EUR
+            + getattr(self, "completion_tokens", 0) * self.PRICE_OUT_EUR
+        )
+
     @property
     @abstractmethod
     def available(self) -> bool:
