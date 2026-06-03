@@ -1,122 +1,173 @@
 # Aktueller Stand
 
-Stand: 2026-06-03 · `main` (Entwicklung gespiegelt auf `claude/confident-johnson-NL99E`)
+Stand: 2026-06-03 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
-## Was fertig & getestet ist
+## Refactor: Hard-Fail-Architektur + BrainManager (neu, 2026-06-03)
 
-### Kern-Pipeline (alle 5 Stufen, end-to-end lauffähig)
-- **Scan → Research (async/parallel) → Prediction (XGBoost + Claude + Brain) →
-  Risk (Kelly + Caps + Veto) → Brain (Lernen) + LLM-Postmortem.**
-- **Dual-Modus:** Paper (Default, kein echtes Geld — aber **echte Ausgänge**, kein
-  Würfel mehr) und Live (Polymarket via `py-clob-client`) hinter **Bestätigung pro
-  Trade**; Secrets nur via `.env`.
-- Läuft komplett **offline** dank Fixtures-Fallback (Gamma ist in der Sandbox geblockt).
+Der große Umbau in dieser Runde — der Bot handelt ab jetzt **nur noch mit echten
+Daten**. Es gibt keine erfundenen Notfall-Signale mehr.
+
+### 1. Hard-Fail — keine erfundenen Daten mehr
+- **`_pseudo()` raus** (`data/sentiment.py`): kein deterministischer Offline-Prior
+  mehr (vorher: Sentiment aus einem Hash der Frage).
+- **VADER raus** (`data/sentiment.py` + `pyproject.toml`): kein Ersatz-Scorer mehr.
+  Ohne echte Texte ist das Sentiment strikt **neutral `0.0`** → kein erfundener Edge.
+- **Fixtures-Fallback raus** (`data/gamma.py`): `fetch_markets()` wirft
+  `DataUnavailableError`, statt 8 Beispiel-Märkte zu liefern. `fixtures.py` bleibt
+  nur als Hilfe für **einen** Scan-Unittest — der Handels-Pfad nutzt sie nie.
+- **Regel:** Fehlen echte Daten (Gamma / RSS / Reddit), **bricht der Zyklus ab**
+  (`orchestrator.run_once` → `DataUnavailableError`). Ein Handelszyklus findet ohne
+  echte externe Signale **nie** statt.
+- **Folge für die Sandbox:** Hier ist Gamma mit 403 geblockt → der Bot stoppt jetzt
+  bewusst (vorher lief er auf Fixtures). Lokal mit Netz liefert Gamma echte Märkte.
+
+### 2. BrainManager — Claude Haiku als Meta-Controller (Stufe 5)
+- Neuer Agent **`agents/brain_manager.py`**, läuft zwischen Predict (3) und
+  Risk/Execution (4). Vor jeder Order bekommt Haiku: getrennte **Reddit/RSS**-
+  Sentiments, die **XGBoost**-Wahrscheinlichkeit und den **MLP-Veto-Score**.
+- Haiku prüft auf **logische Widersprüche** und entscheidet final
+  **„Execution Approved" / „Execution Vetoed"**. Die Begründung jeder Entscheidung
+  wird **zwingend in die DB** geschrieben (Tabelle `manager_decisions`).
+- **Fail-closed**, wenn die LLM-Antwort unbrauchbar ist; **Auto-Approve** ohne
+  API-Key, damit der Paper-Modus auch ohne Anthropic-Key auf echten Signalen läuft.
+- Modell: vorhandener Haiku-Wrapper `claude-haiku-4-5-20251001`.
+
+### 3. Behobene Schwachstellen (aus dem Vulnerability-Assessment)
+- **Live-Close (Prio 1):** `PolymarketExchange.close` markiert einen Trade nur nach
+  **bestätigtem SELL** (oder im Dry-Run) als geschlossen. Schlägt der Verkauf fehl
+  → Trade bleibt **offen** (kein Phantom-Close mehr).
+- **Live-BUY (Prio 2):** eine Order wird erst als Trade gespeichert, wenn
+  **`filled_size > 0`** bestätigt ist (`_parse_execution` / `ExecutionResult`).
+- **Settlement-Enum (Prio 4):** `get_resolution()` liefert statt `True/False/None`
+  jetzt `ResolutionStatus` (**OPEN / YES / NO / CANCELED / AMBIGUOUS / ERROR**).
+  API-Fehler, abgesagte und unklare Märkte sind unterscheidbar und werden geloggt,
+  statt verschluckt zu werden. CANCELED = Refund (PnL 0, nicht fürs Lernen genutzt).
+- **Source-Split (Prio 5):** `ResearchReport` und `FEATURE_NAMES` haben jetzt
+  getrennte Felder für **RSS vs. Reddit** (`rss_sentiment`, `reddit_sentiment`,
+  `rss_sources`, `reddit_sources`, `source_quality`) — das Gehirn kann
+  quellspezifisches Rauschen lernen.
+- **Brain-Seite (Prio 6 / Bug 1.3):** der Brain-Feature-Vektor trägt jetzt die
+  gehandelte **Richtung (`is_yes`) + Edge** (`build_brain_features`,
+  `BRAIN_FEATURE_DIM = 17`, getrennt vom Predictor) — YES/NO-Setups werden nicht
+  mehr vermischt.
+- **brain_weight (Bug 1.2):** das konfigurierte `brain_weight` wirkt jetzt wirklich
+  in der Confidence (vorher hart `0.3`).
+- **Atomare Writes (Prio 8):** `state.json` und `config.json` werden über Temp-Datei
+  + `os.replace` geschrieben (kein halb-geschriebener Zustand mehr).
+- **SQLite robuster (Prio 9):** `PRAGMA journal_mode=WAL` + `busy_timeout=30000`
+  für parallelen Bot-/Server-/Settle-Zugriff.
+
+## Was sonst fertig & getestet ist
+
+### Kern-Pipeline (end-to-end lauffähig, mit echten Daten)
+- **Scan → Research (async, RSS/Reddit getrennt) → Prediction (XGBoost + Claude +
+  Brain) → BrainManager (Haiku-Veto) → Risk (Kelly + Caps + Veto) → Brain (Lernen)
+  + LLM-Postmortem.**
+- **Dual-Modus:** Paper (Default, kein echtes Geld — **echte Ausgänge**, kein Würfel)
+  und Live (Polymarket via `py-clob-client`) hinter **Bestätigung pro Trade**;
+  Secrets nur via `.env`.
+- **Wichtig:** läuft **nicht** mehr ohne echte Datenquellen (siehe Hard-Fail oben).
 
 ### Gehirn (Stufe 5)
-- **numpy-MLP** (Fallback) **und** **PyTorch-MLP** (installiert & verifiziert),
-  gleiches `.npz`-Format (Gewichte zwischen den Backends austauschbar).
-- Lernt aus **Wins + Losses**, Gewichte persistieren, **modusübergreifend Paper→Live**.
+- **numpy-MLP** (Fallback) **und** **PyTorch-MLP**, gleiches `.npz`-Format (Gewichte
+  zwischen den Backends austauschbar). `make_brain()` wählt PyTorch, sobald `torch`
+  installiert ist.
+- Lernt aus **Wins + Losses** (jetzt seiten-/edge-bewusst), Gewichte persistieren,
+  **modusübergreifend Paper→Live**.
 
-### Neu in dieser Runde
+### Backtest & Settlement
 - **Backtest-Modus** (`tradebot/backtest.py`, CLI `backtest`): Monte-Carlo über
-  synthetische Märkte. Zeigt sauber: Edge kommt aus **Markt-Ineffizienz** — bei
-  effizientem Markt bleibt **trotz ~69 % Trefferquote** kein Gewinn (ROI ≈ −0,35),
-  bei ineffizientem Markt klar profitabel.
-- **Live-Settlement-Polling** (CLI `settle [--loop --interval]`): pollt die
-  Auflösung offener Trades, settled sie, schreibt Erfahrung + Lessons, trainiert
-  Brain/Predictor neu. In Paper sofort, in Live über Gamma-Resolution.
-- **PyTorch-Backend** fürs Gehirn (auto-aktiv, sobald `torch` installiert ist).
+  **synthetische** Märkte — ein **separates Analyse-Werkzeug**, kein Handels-Pfad.
+  Zeigt: Edge kommt aus **Markt-Ineffizienz** (effizient ≈ kein Gewinn trotz hoher
+  Trefferquote; ineffizient klar profitabel).
+- **Settlement-Polling** (CLI `settle [--loop --interval]`): pollt offene Trades über
+  das neue `ResolutionStatus`-Enum, settled YES/NO/CANCELED, loggt ERROR/AMBIGUOUS
+  und lässt solche Trades offen; schreibt Erfahrung + Lessons, trainiert neu.
 
-### Dashboard (GitHub Pages)
+### Dashboard (GitHub Pages, Fokus jetzt Localhost)
 - `docs/` statische UI (HTML/CSS/JS, kein Build, keine CDNs) liest
-  `docs/dashboard/state.json` (vom Bot bei jedem `run`/`export` geschrieben).
-- Headless getestet: **Voll-, Leer- und Fetch-Fehler-Zustand** rendern fehlerfrei.
-- **Live** unter **https://cssk68-alt.github.io/Tradebot/** — Deploy direkt von
-  `main` / `/docs` (native GitHub-Pages-Branch-Auslieferung, Build erfolgreich).
+  `docs/dashboard/state.json` (vom Bot bei jedem `run`/`export` **atomar** geschrieben).
+- **Live** unter **https://cssk68-alt.github.io/Tradebot/**. GitHub Pages bleibt im
+  Setup, der primäre Entwicklungs-/Testfokus liegt aber auf der **lokalen** Umgebung.
 
-### Lokaler Server + Einstellungs-UI (neu, 2026-06-03)
-- **`Start.bat`** (Windows): Doppelklick-Starter. Findet `python`/`py` selbst,
-  installiert beim ersten Start die Abhängigkeiten (`pip install -e .`), startet
-  dann den Server und öffnet den Browser automatisch. Selbst-heilend & idempotent.
-- **`tradebot/server.py`**: lokaler HTTP-Server **nur mit der Standardbibliothek**
-  (keine Extra-Abhängigkeit). Serviert `docs/` und bietet
-  `GET/POST /api/config` (+ `GET /api/state`). Start via `python -m tradebot.cli serve`.
-- **`docs/settings.html` + `settings.js`**: Einstellungs-Seite mit **Slider pro
-  Strategie-Knopf**, je **3 Sätze Erklärung + 1 konkretes Beispiel** für alle **13
-  Parameter** (Bankroll, Kelly, Caps, Liquidität/Volumen, Edge/Konfidenz,
-  Brain-Gewicht/Veto, Slippage, Laufzeit-Fenster). „Speichern“ schreibt nach
-  `data/config.json`.
-- **`tradebot/config.py`**: `get_settings()` legt jetzt `data/config.json` über die
-  `.env`-Defaults — die UI-Werte greifen beim nächsten Bot-Start, ohne Code-Edit.
-- **Wichtig:** Speichern funktioniert nur lokal über `Start.bat` (echter Server).
-  Über GitHub Pages ist die Seite nur **Ansicht** (statisch) mit gelbem Hinweis.
+### Lokaler Server + Einstellungs-UI
+- **`Start.bat`** (Windows): Doppelklick-Starter (findet `python`/`py`, installiert
+  Abhängigkeiten, startet Server, öffnet Browser).
+- **`tradebot/server.py`**: lokaler HTTP-Server **nur mit der Standardbibliothek**.
+  Serviert `docs/` und bietet `GET/POST /api/config` (jetzt **atomarer** Write) +
+  `GET /api/state`. Start via `python -m tradebot.cli serve`.
+- **`docs/settings.html` + `settings.js`**: Slider + Erklärungen für die Strategie-
+  Parameter; „Speichern" schreibt nach `data/config.json`.
+- **`tradebot/config.py`**: `get_settings()` legt `data/config.json` über die
+  `.env`-Defaults.
 
-### Echtes Lernen statt Simulation + Scalping (neu, 2026-06-03)
-- **Kein simulierter Ausgang mehr.** Der alte Würfel (`PaperExchange._simulate_yes`)
-  ist entfernt. Paper-Trades lernen jetzt aus **echten** Daten:
-  - **Scalp-Exit** (`close`): realisierter Gewinn aus dem **echten aktuellen
-    Marktpreis** beim Ausstieg, **netto nach Spread**.
-  - **Hold-to-Event** (`settle`): die **echte** Gamma-Auflösung
-    (`gamma.get_resolution`) — „Paper mit echter Auflösung".
-- **Kurz-Horizont (Default `STRATEGY=scalp`):** öffnet **und** schließt Positionen
-  innerhalb von Minuten zum echten Preis (Take-Profit / Stop-Loss / max. Haltedauer).
-  Ziel: viele kleine Trades, deren Mini-Gewinne sich summieren.
-- **Spread-Schutz an zwei Stellen:**
-  1. **Eintrittsfilter** (`predict.py`): Scalp nur, wenn `Take-Profit − Spread ≥
-     MIN_NET_PROFIT` — zu breite Märkte werden gar nicht erst gehandelt.
-  2. **Ergebnis-Formel** (`paper.py`): `PnL = size × (Ausstieg − Einstieg − Spread)`
-     → das Gehirn lernt nur aus **Netto-nach-Spread**-Ergebnissen.
-- **Neue Knöpfe** (`.env` + Einstellungs-UI, je 3 Sätze + Beispiel): `STRATEGY`,
-  `MAX_HOLD_SECONDS`, `TAKE_PROFIT`, `STOP_LOSS`, `MIN_NET_PROFIT`, `MIN_SPREAD_COST`.
-- **CLI:** `scalp` (Kurz-Loop gegen echte Preise), `reset --yes` (alte simulierte
-  Historie löschen, sauber starten), `run --strategy scalp|resolve`.
-- **DB:** Trades haben jetzt `kind` (scalp/resolve) + `exit_price`; automatische
-  Migration für bestehende DBs.
+### Scalping / Kurz-Horizont
+- **Kein simulierter Ausgang.** Scalp-Exit (`close`) realisiert PnL aus dem **echten
+  aktuellen Marktpreis netto nach Spread**; Hold-to-Event (`settle`) nutzt die
+  **echte** Gamma-Auflösung.
+- Default `STRATEGY=scalp`; Schließen per Take-Profit / Stop-Loss / max. Haltedauer.
+- **Spread-Schutz:** Eintrittsfilter (`predict.py`, Scalp nur wenn `Take-Profit −
+  Spread ≥ MIN_NET_PROFIT`) **und** Spread-Abzug in der PnL-Formel (`paper.py`).
+- **Knöpfe** (`.env` + UI): `STRATEGY`, `MAX_HOLD_SECONDS`, `TAKE_PROFIT`,
+  `STOP_LOSS`, `MIN_NET_PROFIT`, `MIN_SPREAD_COST`.
+- **DB:** Trades mit `kind` (scalp/resolve) + `exit_price`; Experiences mit `is_yes`;
+  neue Tabelle `manager_decisions`; automatische Migration für bestehende DBs.
 
 ### Tests
-- **29 Tests** (Kelly, Scan-Filter, Paper-Fills + **Scalp-Exit netto nach Spread**,
-  Edge-/Seiten-Logik, Modelle/Zeitzonen, Brain-Lernen + Persistenz, Backtest,
-  Torch-Interop).
-- **29 grün** (inkl. Torch-Interop; `torch` wurde via Default-PyPI installiert).
-- Zusätzlich verifiziert: Paper-Loop (Brain **und** XGBoost trainieren ohne Fehler),
-  Backtest-Sanity (effizient vs. ineffizient), `settle`-Befehl.
+- **56 grün, 1 übersprungen** (`pytest -q`). Übersprungen = Torch-Interop, weil
+  `torch` in dieser Umgebung nicht installiert ist (optional; mit `torch` grün).
+- Bestehende 29 Tests unverändert grün. **27 neue** für: Hard-Fail (Gamma wirft,
+  Sentiment neutral, kein `_pseudo`/VADER), Live-Close-Fehler lässt Trade offen,
+  Live-BUY-Fill-Prüfung, `ResolutionStatus`-Mapping + Settlement-Verhalten,
+  Brain-Seiten-Feature, BrainManager Approve/Veto/Fallback + DB-Eintrag.
+- Zusätzlich verifiziert: voller Offline-Zyklus (8 Märkte → 8 Signale → 8 Manager-
+  Entscheidungen geloggt → 8 Trades → atomarer Dashboard-Write) und der Hard-Fail-
+  Abbruch bei fehlenden Marktdaten.
 
 ## Offen / hier nicht testbar
-- **Live-Polymarket-Ausführung:** braucht Wallet + API-Keys + Netz. Defensiv
-  codiert (Methoden-Namen je `py-clob-client`-Version), `--dry-run` verifiziert.
-- **Sub-5-Minuten auf echten Märkten:** hängt davon ab, dass Polymarket genug
-  liquide, eng-spreadige Märkte mit schneller Preisbewegung bietet. In der Sandbox
-  (Gamma 403) nicht live prüfbar; offline mit Fixtures + Unit-Tests verifiziert.
-  Der **Live-Scalp-Verkauf** (`PolymarketExchange.close`) ist defensiv codiert,
-  aber ohne Keys nicht real getestet. Mehr in `probleme.md` Punkt 6.
-- **Gamma-API:** in der Sandbox 403 (Egress) → Fixtures; lokal echte Märkte.
-- **PyTorch:** CPU-Index war geblockt, via Default-PyPI aber installiert und
-  end-to-end verifiziert (Backend = `TorchBrain`). Details in `probleme.md`.
+- **Live-Polymarket-Ausführung:** braucht Wallet + API-Keys + Netz. Defensiv codiert
+  (Methoden-/Response-Formen je `py-clob-client`-Version; `_parse_execution` ggf. an
+  die installierte Version anpassen), `--dry-run` verifiziert.
+- **Gamma-API:** in der Sandbox 403 (Egress) → Bot **stoppt** (Hard-Fail); lokal mit
+  Netz echte Märkte. Siehe `probleme.md` Punkt 1.
+- **Sub-5-Minuten auf echten Märkten:** hängt von liquiden, eng-spreadigen Märkten
+  mit schneller Preisbewegung ab; nur lokal mit echten Preisen prüfbar.
+- **PyTorch:** CPU-Index war früher geblockt; via Default-PyPI installierbar und
+  end-to-end verifiziert. Details in `probleme.md`.
+
+## Offen aus dem Assessment (P2, bewusst nicht in dieser Runde)
+- XGBoost-Modell persistieren (statt bei jedem Start neu trainieren).
+- Research-Concurrency begrenzen + Ergebnisse cachen.
+- Echter **ausführbarer** Edge inkl. `best_ask`/`best_bid`, Slippage und Book-Depth
+  (Bug 1.1 / 4.6).
+- `httpx.Client` wiederverwenden; Snapshot-Retention.
 
 ## Setup beim Nutzer (lokal)
 1. `git clone` / `git pull` des Repos.
-2. `ANTHROPIC_API_KEY` in `.env` eintragen (Vorlage: `.env.example`; `.env` ist
-   gitignored, echte Keys bleiben lokal). Ohne Key läuft alles weiter mit
-   Fallbacks (VADER-Sentiment, Heuristik, Fixtures-Märkte).
-3. **Doppelklick `Start.bat`** → installiert Abhängigkeiten, öffnet Dashboard
-   unter `http://localhost:8080`, Einstellungen unter `/settings.html`.
+2. **`ANTHROPIC_API_KEY` in `.env` eintragen** (Vorlage: `.env.example`; `.env` ist
+   gitignored). **Hinweis:** Ohne Key bleibt das Sentiment neutral und der
+   BrainManager auto-approved — es gibt **keine** Fallback-Signale mehr (VADER/
+   Fixtures/Offline-Prior sind entfernt). Für sinnvolle Signale ist der Key
+   empfohlen, und es braucht echten Netzzugang zu Gamma / Google News / Reddit.
+3. **Doppelklick `Start.bat`** → installiert Abhängigkeiten, öffnet Dashboard unter
+   `http://localhost:8080`, Einstellungen unter `/settings.html`.
 
 ## Nächste sinnvolle Schritte
+- APIs lokal scharf schalten und einzeln testen (Anthropic, Gamma, RSS, Reddit),
+  weil der Bot ohne echte Quellen bewusst stoppt.
 - Live-Settlement gegen echte Gamma-Resolutions mit Keys end-to-end testen.
-- Echte historische Daten in den Backtest (statt synthetisch), sobald Gamma erreichbar.
-- Backtest-Ergebnis zusätzlich im Dashboard anzeigen.
-- Optional: macOS/Linux-Starter (`start.sh`) analog zu `Start.bat`.
+- P2-Punkte aus dem Assessment nachziehen (XGBoost-Persistenz, Slippage/Book-Depth).
 
 ## Befehle
 ```bash
 pip install -e .
 python -m tradebot.cli serve                 # lokales Dashboard + Einstellungen
+python -m tradebot.cli scan                  # braucht echtes Gamma (sonst Hard-Fail)
 python -m tradebot.cli scalp --minutes 30 --interval 60   # Kurz-Trades, echte Preise
-python -m tradebot.cli reset --yes           # alte simulierte Historie loeschen
-python -m tradebot.cli scan
+python -m tradebot.cli reset --yes           # alte Historie loeschen, sauber starten
 python -m tradebot.cli run --strategy scalp  # 1 Zyklus (oeffnet/schliesst per Preis)
 python -m tradebot.cli run --strategy resolve --loop --iterations 12
-python -m tradebot.cli backtest --n 500 --signal 0.6
+python -m tradebot.cli backtest --n 500 --signal 0.6   # synthetisch, separates Tool
 python -m tradebot.cli settle --mode live --loop --interval 300
 pytest -q
 ```
