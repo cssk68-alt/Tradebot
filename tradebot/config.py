@@ -53,4 +53,25 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return Settings()
+    s = Settings()
+    _apply_user_config(s)
+    return s
+
+
+def _apply_user_config(s: Settings) -> None:
+    """Override strategy knobs from data/config.json if it exists (written by the local UI)."""
+    import json
+
+    cfg_path = DATA_DIR / "config.json"
+    if not cfg_path.exists():
+        return
+    try:
+        overrides = json.loads(cfg_path.read_text())
+    except Exception:
+        return
+    for key, val in overrides.items():
+        if hasattr(s, key):
+            try:
+                setattr(s, key, val)
+            except Exception:
+                pass
