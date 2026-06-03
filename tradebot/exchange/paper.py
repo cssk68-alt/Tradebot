@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
-from tradebot.exchange.base import Exchange
+from tradebot.exchange.base import Exchange, mark_yes_no, settle_from_resolution
 from tradebot.models import Market, Mode, Order, Trade
 
 
@@ -35,20 +35,12 @@ class PaperExchange(Exchange):
         )
 
     def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:
-        """Hold-to-event: settle from the REAL Gamma resolution (None if not resolved yet)."""
-        res = force_yes if force_yes is not None else self.gamma.get_resolution(trade.market_id)
-        if res is None:
-            return None
-        won = bool(res) if trade.is_yes else (not bool(res))
-        trade.resolved_yes = bool(res)
-        trade.won = won
-        trade.pnl = (
-            trade.size * (1.0 - trade.entry_price) if won else -trade.size * trade.entry_price
-        )
-        trade.kind = "resolve"
-        trade.status = "resolved"
-        trade.resolved_at = datetime.now(timezone.utc)
-        return trade
+        """Hold-to-event: settle from the REAL Gamma resolution (None if not resolved
+        yet, on API error, or on an ambiguous outcome). ``force_yes`` forces the
+        outcome for tests/backfills."""
+        if force_yes is not None:
+            return mark_yes_no(trade, bool(force_yes))
+        return settle_from_resolution(trade, self.gamma.get_resolution(trade.market_id), self.log)
 
     def close(self, trade: Trade, market: Market, reason: str = "time") -> Optional[Trade]:
         """Scalp exit: realize pnl from the market's CURRENT price, charging the

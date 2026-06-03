@@ -77,6 +77,49 @@ class Claude:
         except Exception:
             return None
 
+    def decide_execution(
+        self,
+        question: str,
+        is_yes: bool,
+        model_prob: float,
+        brain_score: float,
+        edge: float,
+        rss_sentiment: float,
+        reddit_sentiment: float,
+        rss_sources: int,
+        reddit_sources: int,
+    ) -> Optional[tuple[bool, str]]:
+        """BrainManager (Stage 5): final approve/veto verdict on a trade.
+
+        Haiku sees the math model, the MLP veto and the SEPARATE Reddit/RSS
+        sentiment and looks for logical contradictions. Returns
+        ``(approved, reason)`` or ``None`` if no parseable verdict came back."""
+        side = "YES" if is_yes else "NO"
+        out = self._complete(
+            "You are the BrainManager, the final risk meta-controller for a prediction-market "
+            "trading bot. You receive the XGBoost probability that YES resolves, the neural-net "
+            "(MLP) veto score in [0,1] (higher = more confident the trade wins), the executable "
+            "edge, and SEPARATE Reddit vs RSS sentiment. Approve only if the signals are mutually "
+            "consistent; veto if you detect a logical contradiction — e.g. sentiment strongly "
+            "opposes the traded side, the MLP veto score is low while the edge is thin, or Reddit "
+            "hype contradicts the RSS news signal. Respond ONLY with JSON "
+            '{"approved": <true|false>, "reason": "<one sentence>"}.',
+            f"Traded side: {side}\n"
+            f"XGBoost P(YES): {model_prob:.3f}\n"
+            f"MLP veto score: {brain_score:.3f}\n"
+            f"Executable edge: {edge:+.3f}\n"
+            f"RSS sentiment: {rss_sentiment:+.2f} from {rss_sources} sources\n"
+            f"Reddit sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources",
+            max_tokens=200,
+        )
+        if not out:
+            return None
+        try:
+            d = json.loads(_json_slice(out))
+            return bool(d["approved"]), str(d.get("reason", ""))
+        except Exception:
+            return None
+
     def postmortem(self, trade_desc: str):
         out = self._complete(
             "You are five expert analysts (data, signal, risk, market, timing) running a "

@@ -1,35 +1,27 @@
-"""Sentiment analysis: Claude if available, else VADER, else a deterministic prior."""
+"""Sentiment analysis — Claude when available, otherwise strictly neutral.
+
+HARD-FAIL policy: there is NO deterministic offline prior and NO VADER fallback.
+When there is no real external text (RSS/Reddit returned nothing), or when no
+LLM scorer is available to read the texts, the sentiment is neutral ``0.0`` so
+the pipeline can never fabricate an edge out of thin air (e.g. from a hash of the
+question). Real signals only.
+"""
 from __future__ import annotations
 
-import hashlib
-
-
-def _vader_score(texts: list[str]):
-    try:
-        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-        if not texts:
-            return None
-        an = SentimentIntensityAnalyzer()
-        vals = [an.polarity_scores(t)["compound"] for t in texts]
-        return sum(vals) / len(vals)
-    except Exception:
-        return None
-
-
-def _pseudo(market_question: str) -> float:
-    """Deterministic offline prior so the pipeline still produces edges with no data."""
-    h = int(hashlib.sha256(market_question.encode()).hexdigest(), 16)
-    return ((h % 1000) / 1000.0 - 0.5) * 0.5  # -0.25 .. 0.25
+NEUTRAL: tuple[float, str] = (0.0, "No external data; neutral sentiment.")
 
 
 def analyze(texts: list[str], market_question: str, claude=None) -> tuple[float, str]:
-    """Return (sentiment in [-1, 1], narrative)."""
-    if claude is not None and claude.available and texts:
+    """Return ``(sentiment in [-1, 1], narrative)``.
+
+    Neutral whenever there is no real data to score, so a missing source can never
+    turn into a synthetic trading signal."""
+    if not texts:
+        return NEUTRAL
+    if claude is not None and claude.available:
         res = claude.sentiment(market_question, texts)
         if res is not None:
             return res
-    v = _vader_score(texts)
-    if v is not None:
-        return max(-1.0, min(1.0, v)), f"{len(texts)} sources, avg sentiment {v:+.2f}."
-    return _pseudo(market_question), "No external data; using offline prior."
+    # Real texts exist but there is no scorer (no API key): stay neutral rather
+    # than guess — we never manufacture sentiment.
+    return 0.0, f"{len(texts)} sources fetched; no LLM scorer available — neutral."

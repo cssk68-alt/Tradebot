@@ -6,6 +6,8 @@ is how the UI integrates with the code without needing a server.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -88,7 +90,19 @@ def build_state(store, settings, brain) -> dict:
 
 
 def export_state(store, settings, brain, out_path) -> Path:
+    """Write the dashboard snapshot atomically (temp file + os.replace) so a reader
+    never observes a half-written state.json."""
     p = Path(out_path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(build_state(store, settings, brain), indent=2))
+    body = json.dumps(build_state(store, settings, brain), indent=2)
+    fd, tmp = tempfile.mkstemp(prefix=p.name + ".", suffix=".tmp", dir=str(p.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(body)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, p)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
     return p

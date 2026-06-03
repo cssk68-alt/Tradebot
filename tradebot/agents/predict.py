@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from tradebot.agents.base import Agent
-from tradebot.ml.features import build_features
+from tradebot.ml.features import build_brain_features, build_features
 from tradebot.models import Candidate, ResearchReport, Side, Signal
 from tradebot.store.lessons import format_lessons
 
@@ -26,6 +26,15 @@ class PredictAgent(Agent):
         for c in candidates:
             m = c.market
             report = reports.get(m.id)
+
+            # HARD-FAIL gate: with real money, never act without real external
+            # research. No sources -> no trade (no synthetic/offline-prior edges).
+            if s.mode == "live" and (report is None or report.n_sources == 0):
+                self.log.info(
+                    "Predict: live skip '%s' — no external research sources", m.question[:40]
+                )
+                continue
+
             feats = build_features(m, report, c.price_move)
             model_prob = self.predictor.predict_yes(feats)
 
@@ -38,8 +47,6 @@ class PredictAgent(Agent):
                     llm_prob, llm_conf, reason = est
                     true_prob = 0.5 * model_prob + 0.5 * llm_prob
                     llm_bump = 0.15 * (llm_conf - 0.5)
-
-            brain_score = self.brain.score(feats)
 
             if true_prob >= m.yes_price + s.edge_threshold:
                 is_yes, price, token = True, m.yes_price, m.yes_token_id
@@ -59,17 +66,24 @@ class PredictAgent(Agent):
                 )
                 continue
 
+            # Score the actual trade (direction + edge), not a generic setup, and
+            # apply the CONFIGURED brain_weight (was hard-coded before).
+            brain_feats = build_brain_features(feats, is_yes, edge)
+            brain_score = self.brain.score(brain_feats)
+            brain_adj = s.brain_weight * (brain_score - 0.5)
+
             confidence = min(
                 1.0,
-                max(0.0, 0.5 + 2.0 * min(abs(edge), 0.25) + 0.3 * (brain_score - 0.5) + llm_bump),
+                max(0.0, 0.5 + 2.0 * min(abs(edge), 0.25) + brain_adj + llm_bump),
             )
             signals.append(
                 Signal(
                     market_id=m.id,
                     token_id=token or f"{m.id}-{'YES' if is_yes else 'NO'}",
                     question=m.question, side=Side.BUY, market_price=price,
-                    true_prob=true_prob, edge=edge, confidence=confidence, is_yes=is_yes,
-                    features=feats, brain_score=brain_score, rationale=reason,
+                    true_prob=true_prob, model_prob=model_prob, edge=edge,
+                    confidence=confidence, is_yes=is_yes, features=feats,
+                    brain_score=brain_score, rationale=reason,
                 )
             )
 

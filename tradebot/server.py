@@ -7,6 +7,8 @@ Serves docs/ as static files and exposes two JSON endpoints:
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import threading
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, HTTPServer
@@ -48,6 +50,22 @@ def _load_config() -> dict:
     return cfg
 
 
+def _atomic_write_json(path: Path, obj: object) -> None:
+    """Write JSON via a temp file + os.replace so a reader never sees a partial file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = json.dumps(obj, indent=2)
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(body)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 class _Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DOCS), **kwargs)
@@ -70,9 +88,8 @@ class _Handler(SimpleHTTPRequestHandler):
         if self.path == "/api/config":
             n = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(n))
-            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
             clean = {k: data[k] for k in DEFAULTS if k in data}
-            CONFIG_PATH.write_text(json.dumps(clean, indent=2))
+            _atomic_write_json(CONFIG_PATH, clean)
             self._json({"ok": True})
         else:
             self.send_response(404)

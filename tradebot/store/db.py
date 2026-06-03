@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from tradebot.models import Experience, Lesson, Mode, Side, Trade
+from tradebot.models import Experience, Lesson, ManagerDecision, Mode, Side, Trade
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS snapshots (
@@ -28,11 +28,17 @@ CREATE TABLE IF NOT EXISTS trades (
 CREATE TABLE IF NOT EXISTS experiences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     features TEXT, edge REAL, size REAL, brain_score REAL,
-    won INTEGER, pnl REAL, mode TEXT
+    won INTEGER, pnl REAL, mode TEXT, is_yes INTEGER DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS lessons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     trade_id INTEGER, category TEXT, cause TEXT, recommendation TEXT, text TEXT
+);
+CREATE TABLE IF NOT EXISTS manager_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    market_id TEXT, question TEXT, approved INTEGER, reason TEXT,
+    model_prob REAL, brain_score REAL, edge REAL, is_yes INTEGER,
+    rss_sentiment REAL, reddit_sentiment REAL, created_at TEXT
 );
 """
 
@@ -44,8 +50,12 @@ def _b(v: Optional[bool]) -> Optional[int]:
 class Store:
     def __init__(self, db_path: Path):
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(db_path))
+        # WAL + busy_timeout make concurrent bot/settle/server access robust.
+        self.conn = sqlite3.connect(str(db_path), timeout=30.0)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
+        self.conn.execute("PRAGMA foreign_keys=ON")
         self.conn.executescript(_SCHEMA)
         self._migrate()
         self.conn.commit()
@@ -57,6 +67,10 @@ class Store:
                 self.conn.execute(f"ALTER TABLE trades ADD COLUMN {col} {ddl}")
             except sqlite3.OperationalError:
                 pass  # column already exists
+        try:  # the brain now learns the traded side, so experiences carry is_yes
+            self.conn.execute("ALTER TABLE experiences ADD COLUMN is_yes INTEGER DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
 
     # --- snapshots (for price-move anomaly detection) ---
     def last_yes_price(self, market_id: str) -> Optional[float]:
@@ -151,22 +165,43 @@ class Store:
     # --- experiences (brain training data; mode-agnostic) ---
     def save_experience(self, e: Experience) -> None:
         self.conn.execute(
-            "INSERT INTO experiences(features, edge, size, brain_score, won, pnl, mode)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (json.dumps(e.features), e.edge, e.size, e.brain_score, int(e.won), e.pnl, e.mode.value),
+            "INSERT INTO experiences(features, edge, size, brain_score, won, pnl, mode, is_yes)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (
+                json.dumps(e.features), e.edge, e.size, e.brain_score, int(e.won),
+                e.pnl, e.mode.value, int(e.is_yes),
+            ),
         )
         self.conn.commit()
 
     def load_experiences(self) -> list[Experience]:
         rows = self.conn.execute("SELECT * FROM experiences").fetchall()
-        return [
-            Experience(
-                features=json.loads(r["features"]), edge=r["edge"], size=r["size"],
-                brain_score=r["brain_score"], won=bool(r["won"]), pnl=r["pnl"],
-                mode=Mode(r["mode"]),
+        out: list[Experience] = []
+        for r in rows:
+            keys = r.keys()
+            out.append(
+                Experience(
+                    features=json.loads(r["features"]), edge=r["edge"], size=r["size"],
+                    brain_score=r["brain_score"], won=bool(r["won"]), pnl=r["pnl"],
+                    mode=Mode(r["mode"]),
+                    is_yes=bool(r["is_yes"]) if "is_yes" in keys and r["is_yes"] is not None else True,
+                )
             )
-            for r in rows
-        ]
+        return out
+
+    # --- manager decisions (BrainManager audit trail) ---
+    def save_manager_decision(self, d: ManagerDecision) -> None:
+        self.conn.execute(
+            "INSERT INTO manager_decisions(market_id, question, approved, reason, model_prob,"
+            " brain_score, edge, is_yes, rss_sentiment, reddit_sentiment, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                d.market_id, d.question, int(d.approved), d.reason, d.model_prob,
+                d.brain_score, d.edge, int(d.is_yes), d.rss_sentiment, d.reddit_sentiment,
+                d.created_at.isoformat(),
+            ),
+        )
+        self.conn.commit()
 
     # --- lessons ---
     def save_lesson(self, lesson: Lesson) -> None:

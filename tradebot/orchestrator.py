@@ -5,13 +5,14 @@ import time
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
+from tradebot.agents.brain_manager import BrainManager
 from tradebot.agents.postmortem import PostmortemAgent
 from tradebot.agents.predict import PredictAgent
 from tradebot.agents.research import ResearchAgent
 from tradebot.agents.risk import RiskAgent
 from tradebot.agents.scan import ScanAgent
 from tradebot.brain.feedback import Brain
-from tradebot.data.gamma import GammaClient
+from tradebot.data.gamma import DataUnavailableError, GammaClient
 from tradebot.exchange.paper import PaperExchange
 from tradebot.exchange.polymarket import PolymarketExchange
 from tradebot.llm.claude import Claude
@@ -44,6 +45,7 @@ class Orchestrator:
         self.predict = PredictAgent(
             settings, self.store, log, self.predictor, self.brain, self.claude
         )
+        self.manager = BrainManager(settings, self.store, log, self.claude)
         self.risk = RiskAgent(settings, self.store, log, self.exchange, self.confirm)
         self.postmortem = PostmortemAgent(settings, self.store, log, self.claude)
 
@@ -60,10 +62,14 @@ class Orchestrator:
 
     def _record_resolved(self, r) -> None:
         self.store.update_trade(r)
+        if r.won is None:
+            # Void / canceled market — a non-outcome; persist it but don't train
+            # the brain on a trade that neither won nor lost.
+            return
         self.store.save_experience(
             Experience(
                 features=r.features, edge=r.edge, size=r.size, brain_score=r.brain_score,
-                won=bool(r.won), pnl=r.pnl, mode=r.mode,
+                won=bool(r.won), pnl=r.pnl, mode=r.mode, is_yes=r.is_yes,
             )
         )
 
@@ -131,16 +137,25 @@ class Orchestrator:
             "=== Cycle start (mode=%s, strategy=%s, bankroll=%.2f, brain_trained=%s) ===",
             self.mode.value, self.settings.strategy, self.bankroll(), self.brain.trained,
         )
-        markets = self.exchange.list_markets()
+        try:
+            markets = self.exchange.list_markets()
+        except DataUnavailableError as e:
+            # HARD-FAIL: no real market data -> abort the cycle; a trading cycle
+            # must never run on synthetic/fallback data.
+            self.log.error("HARD-FAIL: aborting cycle — %s", e)
+            raise
         self.manage_open(markets)
         candidates = self.scan.run(markets)
         reports = self.research.run(candidates)
         signals = self.predict.run(candidates, reports)
+        # Stage 5 meta-controller: Claude Haiku approves/vetoes each signal before
+        # it can reach execution, and records its reasoning to the DB.
+        approved = self.manager.run(signals, reports)
         liq = {c.market.id: c.market.liquidity for c in candidates}
-        placed = self.risk.run(signals, self.bankroll(), liq)
+        placed = self.risk.run(approved, self.bankroll(), liq)
         self.log.info(
-            "=== Cycle done: %d candidates, %d signals, %d trades placed ===",
-            len(candidates), len(signals), len(placed),
+            "=== Cycle done: %d candidates, %d signals, %d approved, %d trades placed ===",
+            len(candidates), len(signals), len(approved), len(placed),
         )
         self._export_dashboard()
         return placed

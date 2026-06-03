@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from tradebot.brain.experience import to_xy
 from tradebot.brain.network import make_brain
-from tradebot.ml.features import FEATURE_DIM
+from tradebot.ml.features import BRAIN_FEATURE_DIM
 from tradebot.models import Experience
 
 
 class Brain:
-    def __init__(self, path, log, input_dim: int = FEATURE_DIM):
+    def __init__(self, path, log, input_dim: int = BRAIN_FEATURE_DIM):
         self.path = str(path)
         self.log = log
         self.net = make_brain(input_dim)

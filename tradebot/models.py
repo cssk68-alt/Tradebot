@@ -18,6 +18,26 @@ class Mode(str, Enum):
     LIVE = "live"
 
 
+class ResolutionStatus(str, Enum):
+    """Settlement outcome of a market — replaces the old boolean True/False/None,
+    so an API error, a still-open market and a canceled/void event are distinct."""
+
+    OPEN = "open"  # not resolved yet
+    YES = "yes"  # resolved YES
+    NO = "no"  # resolved NO
+    CANCELED = "canceled"  # void / refunded (e.g. 50/50 terminal price)
+    AMBIGUOUS = "ambiguous"  # closed but terminal price is not a clean 0/1
+    ERROR = "error"  # could not be determined (API/network error)
+
+
+class Resolution(BaseModel):
+    """Typed result of a settlement query."""
+
+    status: ResolutionStatus
+    resolved_yes: Optional[bool] = None
+    reason: str = ""
+
+
 class Market(BaseModel):
     """A binary Polymarket market (YES/NO outcome tokens)."""
 
@@ -60,10 +80,17 @@ class Candidate(BaseModel):
 
 class ResearchReport(BaseModel):
     market_id: str
-    sentiment: float = 0.0  # -1..1
+    sentiment: float = 0.0  # -1..1, aggregate across all sources
     narrative: str = ""
     n_sources: int = 0
     implied_prob: float = 0.5
+    # Source-separated signals so the brain can learn per-source noise (Reddit
+    # irony/hype vs. RSS macro news) instead of one collapsed score.
+    rss_sentiment: float = 0.0
+    reddit_sentiment: float = 0.0
+    rss_sources: int = 0
+    reddit_sources: int = 0
+    source_quality: float = 0.0  # 0..1 confidence in the research depth
 
 
 class Signal(BaseModel):
@@ -72,7 +99,8 @@ class Signal(BaseModel):
     question: str
     side: Side
     market_price: float
-    true_prob: float
+    true_prob: float  # blended XGBoost + LLM probability
+    model_prob: float = 0.5  # raw XGBoost P(YES), kept separate for the BrainManager
     edge: float
     confidence: float
     is_yes: bool = True  # True = bet YES outcome, False = bet NO
@@ -129,6 +157,7 @@ class Experience(BaseModel):
     won: bool
     pnl: float
     mode: Mode
+    is_yes: bool = True  # traded side — the brain needs it to learn P(trade wins)
 
 
 class Lesson(BaseModel):
@@ -137,3 +166,21 @@ class Lesson(BaseModel):
     cause: str
     recommendation: str
     text: str = ""
+
+
+class ManagerDecision(BaseModel):
+    """The BrainManager's (Claude Haiku) final verdict on a signal — persisted for
+    every judged signal so its reasoning is auditable in the local database."""
+
+    id: Optional[int] = None
+    market_id: str
+    question: str
+    approved: bool
+    reason: str
+    model_prob: float = 0.5
+    brain_score: float = 0.5
+    edge: float = 0.0
+    is_yes: bool = True
+    rss_sentiment: float = 0.0
+    reddit_sentiment: float = 0.0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

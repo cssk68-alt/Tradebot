@@ -1,7 +1,10 @@
 """Polymarket Gamma API client — read-only market data, no auth required.
 
-Falls back to built-in fixtures when the network/API is unavailable so the
-pipeline always runs end-to-end.
+HARD-FAIL policy: there is NO fixtures fallback. If real markets cannot be
+fetched, ``fetch_markets`` raises ``DataUnavailableError`` so a trading cycle can
+never run on synthetic/sample data. Settlement is resilient by contrast: a failed
+resolution query returns ``ResolutionStatus.ERROR`` (logged, trade stays open)
+rather than silently inventing an outcome.
 """
 from __future__ import annotations
 
@@ -9,8 +12,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from tradebot.data.fixtures import sample_markets
-from tradebot.models import Market
+from tradebot.models import Market, Resolution, ResolutionStatus
 
 try:
     import httpx
@@ -27,6 +29,10 @@ _BROWSER_HEADERS = {
 }
 
 
+class DataUnavailableError(RuntimeError):
+    """Raised when real market data cannot be obtained — the cycle must abort."""
+
+
 class GammaClient:
     def __init__(self, log, limit: int = 300, page_size: int = 100, timeout: float = 10.0):
         self.log = log
@@ -35,20 +41,20 @@ class GammaClient:
         self.timeout = timeout
 
     def fetch_markets(self) -> list[Market]:
+        """Return real active markets, or raise — never fall back to fixtures."""
         try:
             markets = self._fetch_live()
-            if markets:
-                self.log.info("Gamma: fetched %d active markets", len(markets))
-                return markets
-            raise RuntimeError("no markets returned")
         except Exception as e:
-            self.log.warning("Gamma unavailable (%s) — using built-in fixtures", e)
-            return sample_markets()
+            raise DataUnavailableError(f"Gamma market fetch failed: {e}") from e
+        if not markets:
+            raise DataUnavailableError("Gamma returned no active markets")
+        self.log.info("Gamma: fetched %d active markets", len(markets))
+        return markets
 
     def _get(self, path: str, params: dict):
         if httpx is None:
             raise RuntimeError("httpx not installed")
-        last_err = None
+        last_err: Optional[BaseException] = None
         for _ in range(3):  # retry transport/5xx only; 4xx (e.g. 403) fails fast
             try:
                 r = httpx.get(
@@ -87,25 +93,45 @@ class GammaClient:
                 break
         return out[: self.limit]
 
-    def get_resolution(self, market_id: str) -> Optional[bool]:
-        """True if YES won, False if NO, None if not yet resolved."""
+    def get_resolution(self, market_id: str) -> Resolution:
+        """Typed settlement status (OPEN / YES / NO / CANCELED / AMBIGUOUS / ERROR).
+
+        API/network failures map to ERROR (not OPEN) so they are distinguishable
+        from a market that simply has not resolved yet."""
         try:
             data = self._get(f"/markets/{market_id}", {})
-        except Exception:
-            return None
+        except Exception as e:
+            return Resolution(status=ResolutionStatus.ERROR, reason=str(e))
         if isinstance(data, list):
             data = data[0] if data else {}
+        if not isinstance(data, dict):
+            return Resolution(status=ResolutionStatus.ERROR, reason="unexpected payload shape")
         if not data.get("closed"):
-            return None
+            return Resolution(status=ResolutionStatus.OPEN)
+
         prices = _loads(data.get("outcomePrices"))
         outcomes = _loads(data.get("outcomes"))
-        if not prices or not outcomes:
-            return None
+        if not prices or not outcomes or len(prices) < 2:
+            return Resolution(
+                status=ResolutionStatus.AMBIGUOUS, reason="closed but missing prices/outcomes"
+            )
         yi = _yes_index(outcomes)
         try:
-            return float(prices[yi]) >= 0.5
+            yes_price = float(prices[yi])
         except Exception:
-            return None
+            return Resolution(status=ResolutionStatus.AMBIGUOUS, reason="unparseable terminal price")
+
+        if abs(yes_price - 1.0) < 1e-6:
+            return Resolution(status=ResolutionStatus.YES, resolved_yes=True)
+        if abs(yes_price - 0.0) < 1e-6:
+            return Resolution(status=ResolutionStatus.NO, resolved_yes=False)
+        if abs(yes_price - 0.5) < 1e-6:
+            return Resolution(
+                status=ResolutionStatus.CANCELED, reason="50/50 refund-like terminal price"
+            )
+        return Resolution(
+            status=ResolutionStatus.AMBIGUOUS, reason=f"non-terminal yes price {yes_price:.4f}"
+        )
 
     @staticmethod
     def _parse(obj: dict) -> Optional[Market]:

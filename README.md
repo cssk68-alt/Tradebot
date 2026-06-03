@@ -21,17 +21,26 @@ explicit per-trade confirmation.
    filters by liquidity / 24h volume / time-to-resolution, flags price moves and
    wide spreads.
 2. **Research** (`agents/research.py`) — for each candidate, gathers free signal
-   (Google News RSS + public Reddit JSON) in parallel and scores sentiment
-   (Claude if an API key is set, else VADER, else an offline prior).
+   (Google News RSS + public Reddit JSON) in parallel and scores RSS and Reddit
+   sentiment **separately** (Claude when an API key is set). HARD-FAIL: there is
+   no VADER and no offline/pseudo prior — with no real text the sentiment is
+   strictly neutral, so the bot never fabricates an edge.
 3. **Prediction** (`agents/predict.py`) — combines an XGBoost predictor, an
    optional Claude estimate, and the brain-score into a calibrated `true_prob`,
    then `edge = true_prob - price`. Emits a signal only past the edge threshold.
 4. **Risk** (`agents/risk.py`, `risk/kelly.py`) — sizes with fractional Kelly,
    applies hard caps and the brain veto, then executes (paper fill or live order).
 5. **Brain** (`brain/`) — a dependency-free neural network that learns
-   `P(trade wins)` from every **resolved** trade (wins *and* losses). Its score
-   feeds back into stages 3 and 4. Weights live in `data/brain.npz` and load in
-   both modes, so what it learns in paper carries into live.
+   `P(trade wins)` from every **resolved** trade (wins *and* losses), now keyed
+   on the traded side (`is_yes`) and edge so YES/NO setups aren't mixed. Its score
+   feeds back into stages 3 and 4; weights live in `data/brain.npz` and carry from
+   paper into live. A Claude **Haiku BrainManager** (`agents/brain_manager.py`)
+   then acts as the final meta-controller: it sees the XGBoost probability, the
+   MLP veto score and the separated Reddit/RSS sentiment, vetoes logically
+   contradictory trades before execution, and logs its reasoning to the database.
+
+Real data is mandatory: the Gamma client raises instead of serving sample markets,
+so a trading cycle never runs without real market data and real external signals.
 
 ## Setup
 

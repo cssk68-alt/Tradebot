@@ -1,4 +1,10 @@
-"""Stage 2: parallel research + sentiment per candidate (RSS + Reddit, free sources)."""
+"""Stage 2: parallel research + sentiment per candidate.
+
+RSS (news) and Reddit are fetched AND scored separately so the ResearchReport
+carries source-specific sentiment/volume. The brain can then learn that, say,
+Reddit is hype-driven for one market type while RSS is better calibrated for
+another — instead of seeing one collapsed score.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -17,15 +23,28 @@ class ResearchAgent(Agent):
 
     async def _one(self, c: Candidate) -> ResearchReport:
         q = c.market.question
-        groups = await asyncio.gather(
+        rss_texts, reddit_texts = await asyncio.gather(
             asyncio.to_thread(rss.fetch_headlines, q),
             asyncio.to_thread(reddit.search_reddit, q),
         )
-        texts = [t for g in groups for t in g]
-        score, narrative = await asyncio.to_thread(sentiment.analyze, texts, q, self.claude)
+        rss_score, rss_narr = await asyncio.to_thread(sentiment.analyze, rss_texts, q, self.claude)
+        reddit_score, reddit_narr = await asyncio.to_thread(
+            sentiment.analyze, reddit_texts, q, self.claude
+        )
+        n_rss, n_reddit = len(rss_texts), len(reddit_texts)
+        total = n_rss + n_reddit
+        score = (rss_score * n_rss + reddit_score * n_reddit) / total if total else 0.0
         return ResearchReport(
-            market_id=c.market.id, sentiment=score, narrative=narrative,
-            n_sources=len(texts), implied_prob=c.market.yes_price,
+            market_id=c.market.id,
+            sentiment=score,
+            narrative=f"RSS: {rss_narr} | Reddit: {reddit_narr}",
+            n_sources=total,
+            implied_prob=c.market.yes_price,
+            rss_sentiment=rss_score,
+            reddit_sentiment=reddit_score,
+            rss_sources=n_rss,
+            reddit_sources=n_reddit,
+            source_quality=min(1.0, total / 8.0),
         )
 
     async def _run_async(self, candidates: list[Candidate]) -> dict[str, ResearchReport]:
