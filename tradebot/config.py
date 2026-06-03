@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.6
     brain_weight: float = 0.3
     brain_veto_threshold: float = 0.35
+    # Manual 'Aggressivitäts-Regler' (Risk-Adjuster), 0..1. A single operator knob
+    # that loosens the veto/confidence/edge gates at RUNTIME via risk/adjuster.py
+    # WITHOUT touching the maths. 0 = conservative (base thresholds), 1 = bold.
+    aggressiveness: float = 0.0
     max_slippage: float = 0.02
     min_days_to_resolution: float = 1.0
     max_days_to_resolution: float = 30.0

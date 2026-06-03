@@ -4,6 +4,7 @@ from __future__ import annotations
 from tradebot.agents.base import Agent
 from tradebot.ml.features import build_brain_features, build_features
 from tradebot.models import Candidate, ResearchReport, Side, Signal
+from tradebot.risk.adjuster import risk_profile
 from tradebot.store.lessons import format_lessons
 
 
@@ -20,6 +21,8 @@ class PredictAgent(Agent):
         self, candidates: list[Candidate], reports: dict[str, ResearchReport]
     ) -> list[Signal]:
         s = self.settings
+        # Effective edge bar from the Risk-Adjuster (base bar when aggressiveness=0).
+        edge_threshold = risk_profile(s).edge_threshold
         lessons = format_lessons(self.store.recent_lessons())
         signals: list[Signal] = []
 
@@ -60,10 +63,10 @@ class PredictAgent(Agent):
                 if reason == "model":
                     reason = f"fact:{report.fact_source}"
 
-            if true_prob >= m.yes_price + s.edge_threshold:
+            if true_prob >= m.yes_price + edge_threshold:
                 is_yes, price, token = True, m.yes_price, m.yes_token_id
                 edge = true_prob - price
-            elif true_prob <= m.yes_price - s.edge_threshold:
+            elif true_prob <= m.yes_price - edge_threshold:
                 is_yes, price, token = False, 1.0 - m.yes_price, m.no_token_id
                 edge = (1.0 - true_prob) - price
             else:

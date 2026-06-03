@@ -29,6 +29,7 @@ DEFAULTS: dict = {
     "confidence_threshold": 0.6,
     "brain_weight": 0.3,
     "brain_veto_threshold": 0.35,
+    "aggressiveness": 0.0,  # Risk-Adjuster knob (Seite 2), 0..1
     "max_slippage": 0.02,
     "min_days_to_resolution": 1.0,
     "max_days_to_resolution": 30.0,
@@ -37,6 +38,11 @@ DEFAULTS: dict = {
     "take_profit": 0.02,
     "stop_loss": 0.03,
     "min_net_profit": 0.005,
+    # Dashboard run controls (Seite 1) — persisted here in UI-native units so the
+    # sliders survive a page reload (front + back in the same place as Seite 2).
+    "run_interval": 60.0,        # seconds between cycles
+    "run_max_eur": 1.0,          # euro budget cap (0 = unlimited)
+    "run_max_runtime_min": 60.0,  # total runtime cap in MINUTES (0 = unlimited)
 }
 
 
@@ -195,8 +201,12 @@ class _Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/config":
             data = self._read_json()
-            clean = {k: data[k] for k in DEFAULTS if k in data}
-            _atomic_write_json(CONFIG_PATH, clean)
+            # MERGE, don't overwrite: Seite 1 (run controls) and Seite 2 (strategy)
+            # each POST only their own keys, so a partial save must not wipe the
+            # other page's values. Start from what is already stored and update.
+            merged = _load_config()
+            merged.update({k: data[k] for k in DEFAULTS if k in data})
+            _atomic_write_json(CONFIG_PATH, merged)
             self._json({"ok": True})
         elif self.path == "/api/run":
             d = self._read_json()

@@ -22,6 +22,7 @@ from typing import Optional
 
 from tradebot.agents.base import Agent
 from tradebot.models import ManagerDecision, ResearchReport, Signal
+from tradebot.risk.adjuster import risk_profile
 
 
 @dataclass
@@ -41,9 +42,14 @@ class BrainManager(Agent):
         self, signals: list[Signal], reports: dict[str, ResearchReport]
     ) -> list[Signal]:
         approved: list[Signal] = []
+        # The operator's Risk-Adjuster 'Ping': one instruction line that tells the
+        # agent how bold to be this cycle (empty when the knob is conservative).
+        profile = risk_profile(self.settings)
+        if profile.appetite_prompt:
+            self.log.info("BrainManager risk appetite: %s", profile.label)
         for sig in signals:
             report = reports.get(sig.market_id)
-            verdict = self._decide(sig, report)
+            verdict = self._decide(sig, report, profile.appetite_prompt)
             self.store.save_manager_decision(
                 ManagerDecision(
                     market_id=sig.market_id, question=sig.question,
@@ -66,7 +72,9 @@ class BrainManager(Agent):
         self.log.info("BrainManager: %d/%d signals approved", len(approved), len(signals))
         return approved
 
-    def _decide(self, sig: Signal, report: Optional[ResearchReport]) -> Verdict:
+    def _decide(
+        self, sig: Signal, report: Optional[ResearchReport], risk_appetite: str = ""
+    ) -> Verdict:
         if self.client is not None and self.client.available:
             res = self.client.decide_execution(
                 question=sig.question, is_yes=sig.is_yes, model_prob=sig.model_prob,
@@ -75,6 +83,7 @@ class BrainManager(Agent):
                 reddit_sentiment=report.reddit_sentiment if report else 0.0,
                 rss_sources=report.rss_sources if report else 0,
                 reddit_sources=report.reddit_sources if report else 0,
+                risk_appetite=risk_appetite,
             )
             if res is not None:
                 approved, reason = res

@@ -2,6 +2,21 @@
 
 const SETTINGS = [
   {
+    key: "aggressiveness",
+    label: "Aggressivität (Risk-Adjuster)",
+    unit: "%",
+    min: 0, max: 100, step: 5,
+    defaultStored: 0.0,
+    isPct: true,
+    desc: [
+      "Ein einziger Regler für die Risikobereitschaft. Er lockert zur Laufzeit die Filter (Brain-Veto, Mindestkonfidenz, Mindest-Edge) und sendet dem BrainManager-Agenten eine Anweisung, mutiger zu sein — OHNE die mathematischen Formeln (Kelly, Brain, Edge) zu verändern.",
+      "0% = konservativ: es gelten exakt die unten eingestellten Schwellenwerte. 100% = mutig: das Brain vetot praktisch nicht mehr über seinen Score, die Konfidenz-Hürde fällt auf 50% und die Edge-Hürde auf einen dünnen Mindestwert.",
+      "Sicherheitsanker bleiben IMMER aktiv: ein positiver Edge ist Pflicht, der Einsatz pro Trade wird mit steigender Aggressivität KLEINER (mehr, aber kleinere Trades), und der Agent vetot weiter bei echten logischen Widersprüchen.",
+      "Tipp: im Paper-Modus hochdrehen, damit genug Trades zustande kommen und das Brain die nötigen ≥8 Ergebnisse zum Lernen bekommt — danach wieder senken, sobald das Brain trainiert ist."
+    ],
+    example: "0% → nur Trades über allen Standard-Schwellen. 70% (aggressiv) → ein Setup mit dünnem Sentiment und niedrigem Brain-Score wird approved, solange Sentiment der Richtung nicht klar widerspricht — aber mit halbiertem Einsatz."
+  },
+  {
     key: "bankroll",
     label: "Startkapital (Bankroll)",
     unit: " USD",

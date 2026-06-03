@@ -2,6 +2,54 @@
 
 Stand: 2026-06-03 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
+## Mehr Trades: Risk-Adjuster + freie Social-Quellen + Slider-Persistenz (neu, 2026-06-03)
+
+Diese Runde zielt auf **mehr und schneller lernende Trades** — über drei Hebel,
+plus ein Reset auf null.
+
+### 1. Aggressivitäts-Regler (Risk-Adjuster)
+- Neues Modul `tradebot/risk/adjuster.py`: EIN Regler `aggressiveness ∈ [0,1]`
+  (Settings + Slider auf Seite 2) lockert zur Laufzeit die Filter, OHNE den
+  mathematischen Kern (Kelly/MLP/Edge) anzufassen — es verschiebt nur die
+  Vergleichsschwellen. `risk_profile(settings)` liefert effektive Werte:
+  Brain-Veto → linear auf 0, Konfidenz → Boden 0.5, Edge → Boden 0.02; dazu
+  `size_factor` (mehr, aber KLEINERE Trades) und einen Klartext-„Ping" für den
+  BrainManager-Prompt.
+- Verdrahtet in `kelly.size_position` (Veto/Konfidenz/Größe), `predict` (Edge-Gate)
+  und `brain_manager`/`llm.client.decide_execution` (Agent-Anweisung). Default
+  `0.0` = unverändertes Verhalten. Tests: `tests/test_adjuster.py`.
+- Bricht den Cold-Start-Teufelskreis: mehr Approvals → mehr settled Trades →
+  Brain erreicht die ≥8-Schwelle und lernt endlich. (Lokal auf `0.7` gesetzt in
+  `data/config.json`, das gitignored ist.)
+
+### 2. Freie Social-Quellen als Reddit-Ersatz
+- Reddits öffentliche API ist faktisch dicht (OAuth/403). Neues Modul
+  `tradebot/data/social.py` aggregiert drei **keyless, dauerhaft kostenlose**
+  Quellen: **Bluesky** (public AppView), **Hacker News** (Algolia), **Lemmy** (v3).
+  Best-effort, jede Quelle gekapselt → eine tote Quelle bricht nie einen Zyklus.
+- In `research.py` füllt der bisherige „Reddit"-Kanal jetzt ein breiter
+  **Social-Kanal** (Reddit nur falls Creds + Bluesky/HN/Lemmy). KEIN
+  Feature-Schema-Wechsel — nutzt den vorhandenen `reddit_*`-Slot weiter, kein
+  Retraining nötig. Labels „Reddit"→„Social" in Narrativ, Agent-Prompt, Dashboard.
+- Live verifiziert: je ~10 echte Snippets pro Frage, ganz ohne Key. Tests:
+  `tests/test_social.py`. Wirkung: der „n_sources==0 → skip"-Fall (`predict.py`)
+  tritt kaum noch auf, und es gibt mehr Sentiment-Signal für handelbare Edges.
+
+### 3. Slider-Persistenz Seite 1 + Config-Merge
+- Die Run-Slider (Pause/Zyklus, Euro-Budget, Laufzeit) auf Seite 1 sprangen beim
+  Reload zurück. Jetzt laden/speichern sie über `/api/config` (Keys `run_interval`,
+  `run_max_eur`, `run_max_runtime_min`) — front + back an derselben Stelle wie Seite 2.
+- `POST /api/config` **merged** jetzt (statt zu überschreiben), damit Seite 1 und
+  Seite 2 sich nicht gegenseitig die Werte löschen.
+
+### 4. Reset auf null
+- Historie genullt (`reset --yes`): trades/experiences/lessons/snapshots +
+  `brain.npz` entfernt; Dashboard via `export` regeneriert. Der Bot lernt ab jetzt
+  nur aus neuen, echten Ergebnissen. (Das `manager_decisions`-Audit bleibt bewusst.)
+
+### Tests
+- **84 grün** (1 Warnung). Neu: `tests/test_adjuster.py` (6), `tests/test_social.py` (5).
+
 ## Live-Verifikation mit Netz + DeepSeek (neu, 2026-06-03)
 
 Erstmals mit Internet + echtem DeepSeek-Key getestet (`LLM_PROVIDER=deepseek`,

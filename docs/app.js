@@ -168,13 +168,38 @@ function wireControls() {
   modeSel.addEventListener("change", () => {
     $("liveGuard").hidden = modeSel.value !== "live";
   });
-  const eur = $("maxEur"), rt = $("maxRuntime");
+  const eur = $("maxEur"), rt = $("maxRuntime"), iv = $("runInterval");
   const showEur = () => ($("eurOut").textContent = +eur.value === 0 ? "aus" : "€" + (+eur.value).toFixed(2));
   const showRt = () => ($("rtOut").textContent = +rt.value === 0 ? "aus" : +rt.value + " min");
   eur.addEventListener("input", showEur);
   rt.addEventListener("input", showRt);
-  showEur();
-  showRt();
+
+  // Persist the run controls to the backend (data/config.json via /api/config) —
+  // the same place Seite 2 uses — so they survive a page reload instead of
+  // snapping back to the HTML defaults. Saved on 'change' (slider released /
+  // number committed) to avoid a POST on every drag tick.
+  const saveRunParams = async () => {
+    try {
+      await _postJSON("/api/config", {
+        run_interval: parseFloat(iv.value) || 60,
+        run_max_eur: parseFloat(eur.value) || 0,
+        run_max_runtime_min: parseFloat(rt.value) || 0,
+      });
+    } catch (e) { /* offline / GitHub Pages: keep local values */ }
+  };
+  [eur, rt, iv].forEach((el) => el.addEventListener("change", saveRunParams));
+
+  const loadRunParams = async () => {
+    try {
+      const cfg = await fetch("/api/config", { cache: "no-store" }).then((r) => r.json());
+      if (cfg.run_interval != null) iv.value = cfg.run_interval;
+      if (cfg.run_max_eur != null) eur.value = cfg.run_max_eur;
+      if (cfg.run_max_runtime_min != null) rt.value = cfg.run_max_runtime_min;
+    } catch (e) { /* not served locally: keep the HTML defaults */ }
+    showEur();
+    showRt();
+  };
+  loadRunParams();
   $("startBtn").addEventListener("click", async () => {
     const mode = modeSel.value;
     const interval = parseFloat($("runInterval").value) || 60;

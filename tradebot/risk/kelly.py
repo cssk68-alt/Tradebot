@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tradebot.models import Signal
+from tradebot.risk.adjuster import risk_profile
 
 
 @dataclass
@@ -29,16 +30,22 @@ def size_position(
     current_exposure: float = 0.0,
     liquidity: float = 1e9,
 ) -> SizeDecision:
+    # Aggressiveness-adjusted thresholds (the maths below is unchanged; only the
+    # bars it is compared against shift with the operator's Risk-Adjuster knob).
+    profile = risk_profile(settings)
+
     price = signal.market_price
     f_star = kelly_fraction(signal.edge, price)
     if f_star <= 0.0:
         return SizeDecision(0.0, 0.0, False, "no positive Kelly edge")
-    if signal.confidence < settings.confidence_threshold:
+    if signal.confidence < profile.confidence_threshold:
         return SizeDecision(0.0, 0.0, False, f"confidence {signal.confidence:.2f} < threshold")
-    if signal.brain_score < settings.brain_veto_threshold:
+    if signal.brain_score < profile.brain_veto_threshold:
         return SizeDecision(0.0, 0.0, False, f"brain veto (score {signal.brain_score:.2f})")
 
-    frac = min(settings.kelly_fraction * f_star, settings.max_trade_pct)
+    # Bolder => more, SMALLER trades: shrink the stake as aggressiveness rises so
+    # approval-rate can climb without the dollar risk per marginal trade climbing.
+    frac = min(settings.kelly_fraction * f_star, settings.max_trade_pct) * profile.size_factor
     amount = frac * bankroll
     budget = max(0.0, settings.max_exposure_pct * bankroll - current_exposure)
     amount = min(amount, budget, 0.1 * max(0.0, liquidity))

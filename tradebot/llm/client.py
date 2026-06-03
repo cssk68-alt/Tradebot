@@ -166,28 +166,39 @@ class LLMClient(ABC):
         reddit_sentiment: float,
         rss_sources: int,
         reddit_sources: int,
+        risk_appetite: str = "",
     ) -> Optional[tuple[bool, str]]:
         """BrainManager (Stage 5): final approve/veto verdict on a trade.
 
         The agent sees the math model, the MLP veto and the SEPARATE Reddit/RSS
         sentiment and looks for logical contradictions. Returns
-        ``(approved, reason)`` or ``None`` if no parseable verdict came back."""
+        ``(approved, reason)`` or ``None`` if no parseable verdict came back.
+
+        ``risk_appetite`` is the operator's Risk-Adjuster 'Ping' (see
+        risk/adjuster.py): a free-text instruction appended to the system prompt
+        that tells the agent how bold to be. Empty string == today's default
+        (conservative) behaviour, so the prompt is unchanged when the knob is 0."""
         side = "YES" if is_yes else "NO"
-        out = self._complete_logged(
+        system = (
             "You are the BrainManager, the final risk meta-controller for a prediction-market "
             "trading bot. You receive the XGBoost probability that YES resolves, the neural-net "
             "(MLP) veto score in [0,1] (higher = more confident the trade wins), the executable "
-            "edge, and SEPARATE Reddit vs RSS sentiment. Approve only if the signals are mutually "
-            "consistent; veto if you detect a logical contradiction — e.g. sentiment strongly "
-            "opposes the traded side, the MLP veto score is low while the edge is thin, or Reddit "
-            "hype contradicts the RSS news signal. Respond ONLY with JSON "
-            '{"approved": <true|false>, "reason": "<one sentence>"}.',
+            "edge, and SEPARATE social (Bluesky/HN/Lemmy/Reddit) vs RSS sentiment. Approve only if "
+            "the signals are mutually consistent; veto if you detect a logical contradiction — e.g. "
+            "sentiment strongly opposes the traded side, the MLP veto score is low while the edge "
+            "is thin, or social hype contradicts the RSS news signal. Respond ONLY with JSON "
+            '{"approved": <true|false>, "reason": "<one sentence>"}.'
+        )
+        if risk_appetite:
+            system += " " + risk_appetite
+        out = self._complete_logged(
+            system,
             f"Traded side: {side}\n"
             f"XGBoost P(YES): {model_prob:.3f}\n"
             f"MLP veto score: {brain_score:.3f}\n"
             f"Executable edge: {edge:+.3f}\n"
             f"RSS sentiment: {rss_sentiment:+.2f} from {rss_sources} sources\n"
-            f"Reddit sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources",
+            f"Social sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources",
             max_tokens=200, task="brainmanager", ctx=question,
         )
         if not out:
