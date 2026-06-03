@@ -232,6 +232,12 @@ class _Handler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
+    def end_headers(self):
+        # Local dev dashboard: don't cache, so edits to HTML/JS/CSS show up on a
+        # plain refresh instead of a stale cached copy (the slider bug).
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def log_message(self, fmt, *args):  # silence per-request noise
         pass
 

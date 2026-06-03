@@ -32,8 +32,8 @@
             <option value="live">Live (echtes Geld)</option>
           </select>
         </label>
-        <label style="font-size:13px;color:#374151">Intervall
-          <input id="runInterval" type="number" value="60" min="5" style="width:60px;margin-left:4px" /> s
+        <label style="font-size:13px;color:#374151" title="Sekunden Pause zwischen zwei Durchläufen (Scan→Research→Trade). Höher = seltener prüfen, weniger API-Kosten. Minimum 5 s.">Pause/Zyklus
+          <input id="runInterval" type="number" value="60" min="5" style="width:60px;margin-left:4px" /> Sek.
         </label>
         <span id="runStatus" class="badge">idle</span>
       </div>
@@ -46,6 +46,9 @@
           Gesamt-Laufzeit: <b id="rtOut">60 min</b> <small class="muted">(0 = unbegrenzt)</small><br/>
           <input id="maxRuntime" type="range" min="0" max="480" step="5" value="60" style="width:240px" />
         </label>
+      </div>
+      <div class="muted" style="margin-top:8px;font-size:12px">
+        <b>Pause/Zyklus</b> = Wartezeit zwischen zwei Durchläufen. <b>Budget</b> &amp; <b>Laufzeit</b> stoppen den Lauf automatisch (0 = aus) — was zuerst erreicht wird, gewinnt.
       </div>
       <div id="liveGuard" hidden style="margin-top:10px;padding:10px 12px;border:1px solid #fca5a5;background:#fef2f2;border-radius:8px;font-size:13px">
         <b style="color:#b91c1c">⚠ Live-Modus handelt mit echtem Geld.</b>
