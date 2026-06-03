@@ -18,3 +18,6 @@ venv/
 *.npz
 *.pt
 *.joblib
+
+# Local documentation & notes (not committed)
+ERKENNTNISSE.txt
