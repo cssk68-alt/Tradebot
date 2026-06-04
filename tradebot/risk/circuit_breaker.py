@@ -25,6 +25,10 @@ def circuit_breaker_reason(
       of the (live) bankroll.
     * Loss streak: trips when ``consecutive_losses`` reaches ``max_consecutive_losses``.
     """
+    # Globaler An/Aus-Schalter (UI-Toggle): wenn deaktiviert, kein Auslösen
+    if not bool(getattr(settings, "circuit_breaker_enabled", True)):
+        return None
+
     max_loss_pct = float(getattr(settings, "max_daily_loss_pct", 0.0) or 0.0)
     max_streak = int(getattr(settings, "max_consecutive_losses", 0) or 0)
 

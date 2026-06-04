@@ -227,7 +227,7 @@ class Orchestrator:
         self._after_resolved(resolved, "Settled")
         return resolved
 
-    def _scalp_trigger(self, t, market) -> Optional[str]:
+    def _scalp_trigger(self, t, market, wind_down_deadline: Optional[float] = None) -> Optional[str]:
         opened = t.opened_at if t.opened_at.tzinfo else t.opened_at.replace(tzinfo=timezone.utc)
         held = (datetime.now(timezone.utc) - opened).total_seconds()
         cur = market.yes_price if t.is_yes else 1.0 - market.yes_price
@@ -238,20 +238,39 @@ class Orchestrator:
             return "stop_loss"
         if held >= self.settings.max_hold_seconds:
             return "time"
+        # Stop-Deadline abgelaufen: sofort schließen, egal ob Gewinn oder Verlust
+        if wind_down_deadline is not None and time.time() >= wind_down_deadline:
+            return "stop"
         return None
 
-    def manage_open(self, markets=None):
+    def manage_open(self, markets=None, wind_down_deadline: Optional[float] = None):
         """Close/settle open trades against FRESH prices.
-        scalp  -> exit on price (take-profit / stop-loss / max hold);
-        resolve -> settle from the real resolution."""
+
+        scalp  -> exit on price (take-profit / stop-loss / max-hold / stop-deadline);
+        resolve -> settle from the real resolution.
+
+        wind_down_deadline: Unix-Timestamp (von time.time()) ab dem alle offenen Trades
+        sofort geschlossen werden — auch ohne Gewinn. Wird gesetzt wenn der Nutzer Stop
+        drückt, damit ALLE Trades innerhalb von max_hold_seconds enden."""
         by_id = {m.id: m for m in (markets or [])}
         resolved = []
         for t in self.store.open_trades(self.mode):
-            if self.settings.strategy == "scalp":
+            # Beim Wind-down (stop_deadline gesetzt) immer Scalp-Logik verwenden,
+            # auch wenn strategy="resolve" konfiguriert ist — kein Trade bleibt offen.
+            if self.settings.strategy == "scalp" or wind_down_deadline is not None:
                 m = by_id.get(t.market_id)
                 if m is None:
-                    continue  # no current price -> leave open
-                reason = self._scalp_trigger(t, m)
+                    if wind_down_deadline is not None:
+                        # Kein Live-Preis während Wind-down: Fehler loggen, Trade bleibt offen.
+                        # Im Dashboard erscheint er als stuck-Trade (gelbe Warnung).
+                        self.log.error(
+                            "WIND-DOWN FEHLER: kein Live-Preis fuer '%s' (market_id=%s) — "
+                            "Trade kann nicht automatisch geschlossen werden. "
+                            "Bitte auf Polymarket manuell pruefen.",
+                            t.question[:70], t.market_id,
+                        )
+                    continue  # kein Preis -> ueberspringen, egal ob Stop oder nicht
+                reason = self._scalp_trigger(t, m, wind_down_deadline=wind_down_deadline)
                 if reason is None:
                     continue
                 r = self.exchange.close(t, m, reason=reason)

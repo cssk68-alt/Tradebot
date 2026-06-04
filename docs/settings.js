@@ -268,34 +268,7 @@ const SETTINGS = [
     ],
     example: "300 Sekunden (5 Min): Tut sich nach 5 Minuten nichts, wird die Position glattgestellt und das Kapital ist wieder frei für den nächsten Trade."
   },
-  {
-    key: "max_daily_loss_pct",
-    label: "Tagesverlust-Limit (Circuit-Breaker)",
-    unit: "%",
-    min: 0, max: 25, step: 1,
-    defaultStored: 0.05,
-    isPct: true,
-    desc: [
-      "Sicherung gegen schlechte Tage: Erreicht der realisierte Verlust eines Tages diesen Anteil der Bankroll, eröffnet der Bot KEINE neuen Trades mehr.",
-      "Offene Positionen werden dabei NICHT abgebrochen — sie laufen geordnet zu Ende (kein Abandon). Erst danach steht der Lauf still.",
-      "0% schaltet diese Sicherung aus. Der Zähler bezieht sich auf den heutigen Tag (UTC) und setzt sich um Mitternacht zurück."
-    ],
-    example: "5% bei 1.000 USD: Sind an einem Tag -50 USD realisiert, stoppt der Bot das Eröffnen neuer Trades und fährt die offenen kontrolliert herunter."
-  },
-  {
-    key: "max_consecutive_losses",
-    label: "Verlust-Streak-Limit (Circuit-Breaker)",
-    unit: "",
-    min: 0, max: 20, step: 1,
-    defaultStored: 5,
-    isPct: false,
-    desc: [
-      "Zweite Sicherung: Nach so vielen Verlust-Trades in Folge stoppt der Bot das Eröffnen neuer Positionen — ein Zeichen, dass das Marktregime gerade nicht zur Strategie passt.",
-      "Ein einzelner Gewinn setzt den Zähler zurück. Stornierte/ungültige Märkte zählen weder als Verlust noch setzen sie zurück.",
-      "0 schaltet diese Sicherung aus. Offene Trades werden auch hier geordnet beendet, nie abgebrochen."
-    ],
-    example: "5 in Folge: Verliert der Bot 5 Trades hintereinander, pausiert das Eröffnen. Gewinnt er zwischendrin einmal, läuft der Zähler wieder bei 0."
-  },
+  { key: "__cb__", isCBSection: true },
   {
     key: "maker_min_edge",
     label: "Maker-First ab Edge (Kostenoptimierung)",
@@ -310,6 +283,36 @@ const SETTINGS = [
     ],
     example: "3% Schwelle: Ein Trade mit 8% Edge wartet als Maker (spart den Spread). Ein Trade mit nur 2% Edge greift sofort als Taker zu."
   }
+];
+
+// --- Circuit-Breaker: eigene Karte mit Toggle -----------------------------------
+const CB_SETTINGS = [
+  {
+    key: "max_daily_loss_pct",
+    label: "Tagesverlust-Limit",
+    unit: "%",
+    min: 0, max: 25, step: 1,
+    defaultStored: 0.05,
+    isPct: true,
+    desc: [
+      "Erreicht der realisierte Verlust eines Tages diesen Anteil der Bankroll, eröffnet der Bot KEINE neuen Trades mehr.",
+      "Offene Positionen laufen geordnet zu Ende — kein Abandon. Der Zähler setzt sich um Mitternacht (UTC) zurück.",
+    ],
+    example: "5 % bei 1.000 USD: Sind an einem Tag −50 USD realisiert, stoppt der Bot neue Trades und fährt offene kontrolliert herunter."
+  },
+  {
+    key: "max_consecutive_losses",
+    label: "Verlust-Streak-Limit",
+    unit: "",
+    min: 1, max: 20, step: 1,
+    defaultStored: 5,
+    isPct: false,
+    desc: [
+      "Nach so vielen Verlust-Trades in Folge stoppt der Bot neue Positionen — Zeichen, dass das Marktregime gerade nicht passt.",
+      "Ein einzelner Gewinn setzt den Zähler zurück. Stornierte Märkte zählen weder als Verlust noch setzen sie zurück.",
+    ],
+    example: "5 in Folge: Verliert der Bot 5 Trades hintereinander, pausiert er. Ein Gewinn zwischendurch → Zähler wieder 0."
+  },
 ];
 
 // --- Presets: 1 frei wählbar ("frei") + 3 feste, empfohlene Setups. -----------
@@ -367,6 +370,7 @@ const PRESET_BUTTONS = [
 ];
 
 let activePreset = "frei";
+let cbEnabled = true;   // Circuit-Breaker An/Aus (UI-Toggle)
 
 function renderPresetBar() {
   const bar = document.getElementById("presetBar");
@@ -388,8 +392,8 @@ function onPreset(name) {
   // passenden Slider (Keys, die es nicht kennt — z.B. bankroll — bleiben unberührt).
   if (name !== "frei" && PRESETS[name]) {
     const p = PRESETS[name];
-    for (const s of SETTINGS) {
-      if (p[s.key] === undefined) continue;
+    for (const s of [...SETTINGS, ...CB_SETTINGS]) {
+      if (s.isCBSection || p[s.key] === undefined) continue;
       const slider = document.getElementById(`slider-${s.key}`);
       if (!slider) continue;
       const dispVal = toDisplay(p[s.key], s);
@@ -397,6 +401,8 @@ function onPreset(name) {
       document.getElementById(`val-${s.key}`).textContent = fmt(dispVal, s) + s.unit;
       slider.style.setProperty("--fill", fillPct(dispVal, s));
     }
+    // Presets aktivieren den Circuit-Breaker immer
+    if (!cbEnabled) onCBToggle(true);
   }
   setActivePreset(name);
 }
@@ -439,6 +445,8 @@ async function loadConfig() {
   }
   const known = ["frei", ...Object.keys(PRESETS)];
   activePreset = known.includes(currentConfig.preset) ? currentConfig.preset : "frei";
+  // Circuit-Breaker: gespeicherten Toggle-Zustand lesen (default: an)
+  cbEnabled = currentConfig.circuit_breaker_enabled !== false;
   renderSettings();
   renderPresetBar();
 }
@@ -448,6 +456,8 @@ function renderSettings() {
   grid.innerHTML = "";
 
   for (const s of SETTINGS) {
+    if (s.isCBSection) { renderCBCard(); continue; }
+
     const storedVal = currentConfig[s.key] !== undefined ? currentConfig[s.key] : s.defaultStored;
     const dispVal = toDisplay(storedVal, s);
     const fp = fillPct(dispVal, s);
@@ -479,23 +489,88 @@ function renderSettings() {
   }
 }
 
+function renderCBCard() {
+  const grid = document.getElementById("settingsGrid");
+  const card = document.createElement("div");
+  card.className = "setting-card cb-card";
+
+  const slidersHtml = CB_SETTINGS.map(s => {
+    const stored = currentConfig[s.key] !== undefined ? currentConfig[s.key] : s.defaultStored;
+    const disp   = toDisplay(stored, s);
+    const fp     = fillPct(disp, s);
+    return `
+      <div>
+        <div class="cb-mini-header">
+          <div class="cb-mini-label">${s.label}</div>
+          <div class="cb-mini-value" id="val-${s.key}">${fmt(disp, s)}${s.unit}</div>
+        </div>
+        <div class="slider-row">
+          <span class="slider-bound">${fmt(s.min, s)}${s.unit}</span>
+          <input type="range" id="slider-${s.key}"
+            min="${s.min}" max="${s.max}" step="${s.step}" value="${disp}"
+            style="--fill:${fp}" oninput="onSlide('${s.key}', this.value)" />
+          <span class="slider-bound">${fmt(s.max, s)}${s.unit}</span>
+        </div>
+        <div class="setting-desc">
+          ${s.desc.map(p => `<p>${p}</p>`).join("")}
+        </div>
+        <div class="setting-example"><strong>Beispiel:</strong> ${s.example}</div>
+      </div>`;
+  }).join("");
+
+  card.innerHTML = `
+    <div class="cb-card-header">
+      <div>
+        <div class="cb-card-title">⚡ Circuit-Breaker</div>
+        <div class="cb-card-sub">Schutzmechanismus bei schlechten Tagen. Im Paper-Modus ausschalten → Bot handelt weiter und sammelt mehr Lerndaten.</div>
+      </div>
+      <div class="toggle-wrap">
+        <span class="toggle-lbl${cbEnabled ? " on" : ""}" id="cb-lbl">${cbEnabled ? "AN" : "AUS"}</span>
+        <label class="toggle" title="${cbEnabled ? "Circuit-Breaker deaktivieren" : "Circuit-Breaker aktivieren"}">
+          <input type="checkbox" id="cb-toggle" ${cbEnabled ? "checked" : ""} onchange="onCBToggle(this.checked)">
+          <span class="tog-track"></span>
+        </label>
+      </div>
+    </div>
+    <div class="cb-sliders${cbEnabled ? "" : " off"}" id="cb-sliders">
+      ${slidersHtml}
+    </div>`;
+
+  grid.appendChild(card);
+}
+
+function onCBToggle(on) {
+  cbEnabled = on;
+  const lbl = document.getElementById("cb-lbl");
+  lbl.textContent = on ? "AN" : "AUS";
+  lbl.className   = "toggle-lbl" + (on ? " on" : "");
+  document.getElementById("cb-toggle").title = on
+    ? "Circuit-Breaker deaktivieren" : "Circuit-Breaker aktivieren";
+  document.getElementById("cb-sliders").className = "cb-sliders" + (on ? "" : " off");
+}
+
 function onSlide(key, rawVal) {
-  const s = SETTINGS.find(x => x.key === key);
+  const s = SETTINGS.find(x => x.key === key) || CB_SETTINGS.find(x => x.key === key);
   const dispVal = parseFloat(rawVal);
   document.getElementById(`val-${key}`).textContent = fmt(dispVal, s) + s.unit;
-  const slider = document.getElementById(`slider-${key}`);
-  slider.style.setProperty("--fill", fillPct(dispVal, s));
-  // Any manual move means the config no longer matches a fixed preset -> "Frei".
+  document.getElementById(`slider-${key}`).style.setProperty("--fill", fillPct(dispVal, s));
   setActivePreset("frei");
 }
 
 async function saveConfig() {
   const config = {};
   for (const s of SETTINGS) {
+    if (s.isCBSection) continue;
     const slider = document.getElementById(`slider-${s.key}`);
     config[s.key] = toStored(parseFloat(slider.value), s);
   }
-  config.preset = activePreset;  // remember the UI choice (slider values stay source of truth)
+  // Circuit-Breaker: Sliderwerte immer speichern (damit sie beim Re-Aktivieren erhalten bleiben)
+  for (const s of CB_SETTINGS) {
+    const slider = document.getElementById(`slider-${s.key}`);
+    if (slider) config[s.key] = toStored(parseFloat(slider.value), s);
+  }
+  config.circuit_breaker_enabled = cbEnabled;
+  config.preset = activePreset;
 
   const msg = document.getElementById("saveMsg");
   try {

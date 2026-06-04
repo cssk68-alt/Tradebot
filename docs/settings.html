@@ -84,6 +84,43 @@
     }
     .setting-example strong { color: var(--accent); }
 
+    /* ---- Circuit-Breaker Togglekarte ---- */
+    .cb-card {
+      border: 2px solid #fbbf24;   /* gelber Rahmen — hebt die Karte ab */
+    }
+    .cb-card-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 6px; gap: 12px;
+    }
+    .cb-card-title { font-weight: 700; font-size: 15px; color: var(--ink); }
+    .cb-card-sub   { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+    .cb-sliders { display: flex; flex-direction: column; gap: 20px; margin-top: 16px; }
+    .cb-sliders.off { opacity: 0.32; pointer-events: none; }
+    .cb-mini-header {
+      display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;
+    }
+    .cb-mini-label { font-weight: 700; font-size: 14.5px; color: var(--ink); padding-top: 2px; }
+    .cb-mini-value { font-size: 22px; font-weight: 700; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+
+    /* Toggle-Schalter */
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .toggle-lbl { font-size: 12.5px; font-weight: 700; color: #9ca3af; min-width: 22px; text-align: center; }
+    .toggle-lbl.on { color: #16a34a; }
+    .toggle { position: relative; display: inline-block; width: 46px; height: 26px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .tog-track {
+      position: absolute; inset: 0; border-radius: 26px;
+      background: #d1d5db; cursor: pointer; transition: background .2s;
+    }
+    .toggle input:checked + .tog-track { background: #16a34a; }
+    .tog-track::before {
+      content: ""; position: absolute; width: 20px; height: 20px;
+      left: 3px; top: 3px; border-radius: 50%;
+      background: white; transition: transform .2s;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    }
+    .toggle input:checked + .tog-track::before { transform: translateX(20px); }
+
     .save-bar {
       position: sticky; bottom: 0; background: #fff; border-top: 1px solid var(--line);
       padding: 14px 24px; display: flex; justify-content: flex-end;

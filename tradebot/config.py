@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     # Circuit breaker (Teil B.2): stop opening NEW trades when the day's realized
     # loss or a losing streak hits its limit. Open positions are never abandoned —
     # the loop winds them down gracefully. 0 disables that arm.
+    circuit_breaker_enabled: bool = True  # globaler An/Aus-Schalter (UI-Toggle)
     max_daily_loss_pct: float = 0.05
     max_consecutive_losses: int = 5
 

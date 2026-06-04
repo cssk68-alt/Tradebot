@@ -120,6 +120,7 @@ def build_state(store, settings, brain) -> dict:
             "max_spread": getattr(settings, "max_spread", 0.03),
             "max_daily_loss_pct": getattr(settings, "max_daily_loss_pct", 0.0),
             "max_consecutive_losses": getattr(settings, "max_consecutive_losses", 0),
+            "max_hold_seconds": getattr(settings, "max_hold_seconds", 300.0),
         },
     }
 

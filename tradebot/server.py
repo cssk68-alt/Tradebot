@@ -37,6 +37,7 @@ DEFAULTS: dict = {
     "min_days_to_resolution": 1.0,
     "max_days_to_resolution": 30.0,
     # circuit breaker (Teil B.2) — 0 disables that arm
+    "circuit_breaker_enabled": True,  # globaler An/Aus-Schalter
     "max_daily_loss_pct": 0.05,
     "max_consecutive_losses": 5,
     # maker-first execution (Teil B.3)
@@ -204,25 +205,31 @@ class _Runner:
             self._stop.set()
 
     def _wind_down(self, orch, log) -> None:
-        """Graceful Stop: open NO new positions, but let the OPEN ones finish.
+        """Graceful Stop: keine neuen Positionen öffnen, alle offenen schließen.
 
-        A Stop (or a hit budget/runtime cap) must never abandon a live position.
-        Scalp trades exit on price (take-profit / stop-loss / max-hold), so they
-        need active polling: keep calling ``manage_open`` — opening nothing new —
-        until the book is flat or a safety deadline (max_hold + margin) passes.
-        Resolve trades settle only at the real market resolution (days away): one
-        settle sweep, then they stay in the DB for the ``settle`` poller — they are
-        persisted, never lost. A second Stop while winding down sets ``_force`` and
-        aborts this hard, handing any leftovers to ``settle`` too."""
+        Nach einem Stop (oder Limit-Erreichen) werden ALLE offenen Trades innerhalb
+        von max_hold_seconds geschlossen — ohne Ausnahme, auch bei Verlust:
+          1. Zuerst versucht der Bot mit Gewinn zu schließen (take_profit).
+          2. Falls nicht möglich: neutral (stop_loss oder break-even).
+          3. Wenn die Deadline abläuft: sofort schließen, egal zu welchem Preis.
+
+        Ein zweiter Stop während des Wind-downs setzt _force und bricht hart ab —
+        verbleibende Trades werden dann vom settle-Poller übernommen."""
         import time as _t
 
         self.draining = True
         try:
-            strategy = getattr(orch.settings, "strategy", self.strategy or "scalp")
+            max_hold = float(getattr(orch.settings, "max_hold_seconds", 300.0))
+            # Gemeinsame Deadline für alle offenen Trades: ab jetzt + max_hold_seconds
+            # schließt _scalp_trigger jeden Trade sofort (egal ob Gewinn oder Verlust).
+            wind_down_deadline = _t.time() + max_hold
 
             def _sweep() -> int:
                 try:
-                    orch.manage_open(orch.exchange.list_markets())
+                    orch.manage_open(
+                        orch.exchange.list_markets(),
+                        wind_down_deadline=wind_down_deadline,
+                    )
                 except Exception as e:  # never let a sweep crash the wind-down
                     log.warning("wind-down manage_open failed: %s", e)
                 self.cost = orch.client.cost_eur
@@ -230,24 +237,13 @@ class _Runner:
 
             open_left = _sweep()
 
-            if strategy != "scalp":
-                # resolve: can't force-close before the market resolves; the open
-                # trades persist in the DB for the settle poller — not abandoned.
-                self.last = f"Gestoppt — {open_left} offene Trade(s) warten auf Resolution"
-                self.stop_reason = (self.stop_reason or "Gestoppt") + (
-                    f" — {open_left} offene Trade(s) an settle-Poller uebergeben"
-                    if open_left else " — keine offenen Trades"
-                )
-                return
-
-            # scalp: actively drain until flat or the safety deadline. A scalp
-            # position closes within max_hold_seconds at the latest, so this is
-            # bounded; the margin covers the final poll + settlement.
-            deadline = _t.time() + float(getattr(orch.settings, "max_hold_seconds", 300.0)) + 120.0
+            # Drain bis das Buch leer ist oder die harte Sicherheits-Deadline greift
+            # (max_hold + 120s Puffer für den letzten Poll + Settlement).
+            hard_deadline = wind_down_deadline + 120.0
             poll = max(5.0, min(self.interval, 30.0))
             while open_left and not self._force.is_set():
                 self.last = f"Beende offene Trades … {open_left} noch offen"
-                if _t.time() >= deadline:
+                if _t.time() >= hard_deadline:
                     self.stop_reason = (self.stop_reason or "Gestoppt") + (
                         f" — Zeitlimit, {open_left} Trade(s) noch offen (settle uebernimmt)"
                     )

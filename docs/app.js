@@ -8,6 +8,39 @@ const fmt = (n, d = 2) =>
   n == null ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const pct = (n) => (n == null ? "—" : (n * 100).toFixed(1) + "%");
 
+// Relative Zeit: "2m 14s", "1h 5m", "12s"
+function relTime(iso) {
+  if (!iso) return "—";
+  const s = Math.max(0, Math.floor((Date.now() - new Date(iso)) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+// Kurze Uhrzeit: "14:32"
+function fmtTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Gelbe Warnung bei Trades die länger offen sind als 2x max_hold
+function stuckWarning(openTrades, maxHoldSec) {
+  const limit = (maxHoldSec || 300) * 2;
+  const stuck = (openTrades || []).filter(t => t.opened_at &&
+    (Date.now() - new Date(t.opened_at)) / 1000 > limit);
+  if (!stuck.length) return "";
+  return `<div class="warn-banner">
+    ⚠️ <strong>${stuck.length} Trade(s) konnten nicht automatisch geschlossen werden</strong><br>
+    Diese Positionen sind länger offen als das doppelte Scalp-Limit (${limit}s).
+    Mögliche Ursachen: kein aktueller Marktpreis mehr verfügbar, oder die Sell-Order wurde
+    vom Exchange nicht angenommen. <strong>Bitte auf Polymarket manuell prüfen.</strong>
+    <ul>${stuck.map(t =>
+      `<li><b>${esc(t.question)}</b> — ${t.side} — offen seit <b>${relTime(t.opened_at)}</b></li>`
+    ).join("")}</ul>
+  </div>`;
+}
+
 async function load() {
   try {
     const res = await fetch("dashboard/state.json", { cache: "no-store" });
@@ -41,7 +74,8 @@ function render(s) {
   if ($("diagnostics")) $("diagnostics").innerHTML = diagnosticsHtml(s);
   if ($("brainDiag")) $("brainDiag").innerHTML = brainDiagHtml(s);
   $("resolvedTable").innerHTML = tradesTable(s.resolved_trades, true);
-  $("openTable").innerHTML = tradesTable(s.open_trades, false);
+  const maxHold = (s.config || {}).max_hold_seconds || 300;
+  $("openTable").innerHTML = stuckWarning(s.open_trades, maxHold) + tradesTable(s.open_trades, false);
   $("lessons").innerHTML = lessonsHtml(s.lessons);
 }
 
@@ -148,18 +182,20 @@ function brainDiagHtml(s) {
 function tradesTable(rows, resolved) {
   if (!rows || !rows.length) return '<div class="empty">None.</div>';
   const head = resolved
-    ? "<tr><th>Market</th><th>Side</th><th>Entry</th><th>Edge</th><th>Brain</th><th>PnL</th><th>Result</th></tr>"
-    : "<tr><th>Market</th><th>Side</th><th>Entry</th><th>Size</th><th>Edge</th><th>Brain</th></tr>";
+    ? "<tr><th>Market</th><th>Side</th><th>Entry</th><th>Edge</th><th>Brain</th><th>PnL</th><th>Result</th><th>Geschlossen</th></tr>"
+    : "<tr><th>Market</th><th>Side</th><th>Entry</th><th>Size</th><th>Edge</th><th>Brain</th><th>Offen seit</th></tr>";
   const body = rows.slice().reverse().map((t) => {
     const side = `<span class="tag ${t.side === "YES" ? "yes" : "no"}">${esc(t.side)}</span>`;
     if (resolved) {
       const res = t.won ? '<span class="tag win">WIN</span>' : '<span class="tag loss">LOSS</span>';
       const pnl = `<span class="${t.pnl >= 0 ? "pos" : "neg"}">${t.pnl >= 0 ? "+" : ""}${fmt(t.pnl)}</span>`;
+      const ts  = `<td class="ts">${fmtTime(t.resolved_at)}</td>`;
       return `<tr><td class="q" title="${esc(t.question)}">${esc(t.question)}</td><td>${side}</td>` +
-        `<td>${fmt(t.entry, 2)}</td><td>${fmt(t.edge, 2)}</td><td>${fmt(t.brain, 2)}</td><td>${pnl}</td><td>${res}</td></tr>`;
+        `<td>${fmt(t.entry, 2)}</td><td>${fmt(t.edge, 2)}</td><td>${fmt(t.brain, 2)}</td><td>${pnl}</td><td>${res}</td>${ts}</tr>`;
     }
+    const ts = `<td class="ts">${relTime(t.opened_at)}</td>`;
     return `<tr><td class="q" title="${esc(t.question)}">${esc(t.question)}</td><td>${side}</td>` +
-      `<td>${fmt(t.entry, 2)}</td><td>${fmt(t.size, 0)}</td><td>${fmt(t.edge, 2)}</td><td>${fmt(t.brain, 2)}</td></tr>`;
+      `<td>${fmt(t.entry, 2)}</td><td>${fmt(t.size, 0)}</td><td>${fmt(t.edge, 2)}</td><td>${fmt(t.brain, 2)}</td>${ts}</tr>`;
   }).join("");
   return `<table>${head}${body}</table>`;
 }

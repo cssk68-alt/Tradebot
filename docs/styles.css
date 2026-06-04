@@ -78,3 +78,13 @@ ul.lessons { list-style: none; padding: 0; margin: 0; display: flex; flex-direct
 ul.lessons li { font-size: 13px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
 .foot { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 0 24px; }
 code { background: #eef0f4; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+
+/* Gelbe Warnung für Trades die nicht geschlossen werden konnten */
+.warn-banner {
+  background: #fffbeb; border: 2px solid #f59e0b; border-radius: 12px;
+  padding: 16px 20px; font-size: 13.5px; color: #78350f; line-height: 1.7;
+}
+.warn-banner strong { color: #92400e; }
+.warn-banner ul { margin: 8px 0 0; padding-left: 20px; }
+.warn-banner li { margin-bottom: 4px; font-size: 13px; }
+td.ts { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
