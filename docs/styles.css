@@ -88,3 +88,63 @@ code { background: #eef0f4; padding: 1px 5px; border-radius: 5px; font-size: 12p
 .warn-banner ul { margin: 8px 0 0; padding-left: 20px; }
 .warn-banner li { margin-bottom: 4px; font-size: 13px; }
 td.ts { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* ---- Ampel (Traffic-Light Control) ---- */
+.tl-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0;
+}
+.tl-housing {
+  background: #1c1c1e; border: 2px solid #3a3a3c; border-radius: 14px;
+  padding: 9px 8px; display: flex; flex-direction: column; gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.04);
+  transition: border-color .18s, transform .1s;
+}
+.tl-housing:hover:not(.disabled) { border-color: #5a5a5e; transform: scale(1.05); }
+.tl-housing:active:not(.disabled) { transform: scale(.96); }
+.tl-housing.disabled { cursor: not-allowed; opacity: .38; }
+.tl-dot {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #2a2a2c;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.7);
+  transition: background .22s, box-shadow .22s;
+}
+/* Rot — gestoppt */
+.tl-housing.stopped .tl-dot:nth-child(1) {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444, 0 0 20px rgba(239,68,68,.5), inset 0 1px 2px rgba(255,255,255,.18);
+}
+/* Gelb — startet / stoppt (blinkt) */
+.tl-housing.draining .tl-dot:nth-child(2),
+.tl-housing.starting .tl-dot:nth-child(2) {
+  animation: tl-blink-y .88s ease-in-out infinite;
+}
+/* Grün — läuft */
+.tl-housing.running .tl-dot:nth-child(3) {
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e, 0 0 20px rgba(34,197,94,.5), inset 0 1px 2px rgba(255,255,255,.18);
+}
+/* Panik — alle Punkte + Gehäuse blinken schnell rot */
+.tl-housing.panic { animation: tl-panic-box .28s ease-in-out infinite; }
+.tl-housing.panic .tl-dot { animation: tl-panic-dot .28s ease-in-out infinite; }
+
+@keyframes tl-blink-y {
+  0%,100% { background:#f59e0b; box-shadow:0 0 8px #f59e0b,0 0 18px rgba(245,158,11,.5); }
+  50%     { background:#2a2a2c; box-shadow:inset 0 2px 5px rgba(0,0,0,.7); }
+}
+@keyframes tl-panic-box {
+  0%,100% { background:#1c1c1e; border-color:#3a3a3c; }
+  50%     { background:#450a0a; border-color:#ef4444; }
+}
+@keyframes tl-panic-dot {
+  0%,100% { background:#ef4444; box-shadow:0 0 10px #ef4444,0 0 24px rgba(239,68,68,.7); }
+  50%     { background:#2a2a2c; box-shadow:inset 0 2px 5px rgba(0,0,0,.7); }
+}
+.tl-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; text-align: center; color: var(--muted);
+}
+.tl-housing.running  ~ .tl-label { color: var(--pos); }
+.tl-housing.draining ~ .tl-label,
+.tl-housing.starting ~ .tl-label { color: #f59e0b; }
+.tl-housing.panic    ~ .tl-label { color: var(--neg); }

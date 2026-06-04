@@ -241,26 +241,39 @@ async function _postJSON(path, body) {
 }
 
 function renderRunStatus(st) {
-  const badge = $("runStatus");
-  const running = !!(st && st.running);
+  const tl     = $("trafficLight");
+  const label  = $("tlLabel");
+  const badge  = $("runStatus");
+  const running  = !!(st && st.running);
   const draining = !!(st && st.draining);
+  const hasError = !!(st && st.error);
   const eur = st && st.cost ? ` · €${Number(st.cost).toFixed(4)}` : "";
-  badge.textContent = draining
-    ? `beende offene Trades …${eur}`
-    : running
-    ? `running · ${st.mode} · Zyklus ${st.cycle}${eur}`
-    : (st && st.error ? "Fehler" : "idle");
-  badge.className = "badge " + (running ? (st.mode === "live" ? "live" : "paper") : "");
-  const start = $("startBtn"), stop = $("stopBtn");
-  start.disabled = running;            // no new run while one is still winding down
-  stop.disabled = !running;
-  // While winding down the Stop button becomes a hard-abort (skips finishing).
-  stop.textContent = draining ? "■ Sofort abbrechen" : "■ Stop";
-  start.style.opacity = running ? 0.5 : 1;
-  stop.style.opacity = running ? 1 : 0.5;
-  $("runMsg").textContent = (st && st.error)
+
+  // Ampel-Zustand setzen
+  const state = !_apiOk  ? "disabled" :
+                hasError ? "panic"    :
+                draining ? "draining" :
+                running  ? "running"  : "stopped";
+  if (tl)    tl.className    = "tl-housing " + state;
+  if (label) label.textContent =
+    state === "disabled" ? "offline"          :
+    state === "panic"    ? "Fehler"           :
+    state === "draining" ? "Stopp…"           :
+    state === "running"  ? `Zyklus ${st.cycle}` : "Stopp";
+
+  // Info-Badge (Modus + Kosten)
+  if (badge) {
+    badge.textContent = draining
+      ? `beende Trades…${eur}`
+      : running
+      ? `${st.mode} · Zyklus ${st.cycle}${eur}`
+      : (hasError ? "Fehler" : "—");
+    badge.className = "badge " + (running ? (st.mode === "live" ? "live" : "paper") : "");
+  }
+  $("runMsg").textContent = hasError
     ? "⚠ " + st.error
-    : (st && st.stop_reason && !running) ? "Gestoppt: " + st.stop_reason
+    : (st && st.stop_reason && !running)
+    ? "Gestoppt: " + st.stop_reason
     : (st && st.last) || "";
 }
 
@@ -269,13 +282,16 @@ async function pollStatus() {
     const st = await fetch("/api/status", { cache: "no-store" }).then((r) => r.json());
     _apiOk = true;
     renderRunStatus(st);
-    if (st.running) load(); // refresh KPIs/tables while the loop runs
+    if (st.running) load();
   } catch (e) {
     if (!_apiOk) {
-      // Not served by serve() (e.g. GitHub Pages) — controls only work locally.
-      $("runStatus").textContent = "—";
-      $("startBtn").disabled = $("stopBtn").disabled = true;
-      $("startBtn").style.opacity = $("stopBtn").style.opacity = 0.5;
+      // GitHub Pages oder kein Server — Ampel zeigt "offline"
+      const tl = $("trafficLight");
+      if (tl) tl.className = "tl-housing disabled";
+      const lbl = $("tlLabel");
+      if (lbl) lbl.textContent = "offline";
+      const badge = $("runStatus");
+      if (badge) badge.textContent = "—";
       $("runMsg").textContent = "Steuerung nur lokal: python -m tradebot.cli serve";
     }
   }
@@ -288,14 +304,10 @@ function wireControls() {
   });
   const eur = $("maxEur"), rt = $("maxRuntime"), iv = $("runInterval");
   const showEur = () => ($("eurOut").textContent = +eur.value === 0 ? "aus" : "€" + (+eur.value).toFixed(2));
-  const showRt = () => ($("rtOut").textContent = +rt.value === 0 ? "aus" : +rt.value + " min");
+  const showRt  = () => ($("rtOut").textContent  = +rt.value  === 0 ? "aus" : +rt.value + " min");
   eur.addEventListener("input", showEur);
   rt.addEventListener("input", showRt);
 
-  // Persist the run controls to the backend (data/config.json via /api/config) —
-  // the same place Seite 2 uses — so they survive a page reload instead of
-  // snapping back to the HTML defaults. Saved on 'change' (slider released /
-  // number committed) to avoid a POST on every drag tick.
   const saveRunParams = async () => {
     try {
       await _postJSON("/api/config", {
@@ -303,46 +315,61 @@ function wireControls() {
         run_max_eur: parseFloat(eur.value) || 0,
         run_max_runtime_min: parseFloat(rt.value) || 0,
       });
-    } catch (e) { /* offline / GitHub Pages: keep local values */ }
+    } catch (e) { /* offline */ }
   };
   [eur, rt, iv].forEach((el) => el.addEventListener("change", saveRunParams));
 
   const loadRunParams = async () => {
     try {
       const cfg = await fetch("/api/config", { cache: "no-store" }).then((r) => r.json());
-      if (cfg.run_interval != null) iv.value = cfg.run_interval;
-      if (cfg.run_max_eur != null) eur.value = cfg.run_max_eur;
-      if (cfg.run_max_runtime_min != null) rt.value = cfg.run_max_runtime_min;
-    } catch (e) { /* not served locally: keep the HTML defaults */ }
-    showEur();
-    showRt();
+      if (cfg.run_interval       != null) iv.value  = cfg.run_interval;
+      if (cfg.run_max_eur        != null) eur.value = cfg.run_max_eur;
+      if (cfg.run_max_runtime_min!= null) rt.value  = cfg.run_max_runtime_min;
+    } catch (e) { /* nicht lokal */ }
+    showEur(); showRt();
   };
   loadRunParams();
-  $("startBtn").addEventListener("click", async () => {
-    const mode = modeSel.value;
-    const interval = parseFloat($("runInterval").value) || 60;
-    const body = {
-      mode, strategy: "scalp", interval,
-      max_eur: parseFloat($("maxEur").value) || 0,
-      max_runtime: (parseFloat($("maxRuntime").value) || 0) * 60, // min -> sec
-    };
-    if (mode === "live") {
-      if (!$("liveAck").checked || $("liveConfirm").value.trim() !== "LIVE") {
-        $("runMsg").textContent = "Live abgebrochen: Häkchen setzen und LIVE eintippen.";
-        return;
+
+  // --- Ampel-Klick: startet oder stoppt den Bot ---
+  $("trafficLight").addEventListener("click", async () => {
+    const tl    = $("trafficLight");
+    const state = ["stopped","running","draining","starting","panic","disabled"]
+                    .find(s => tl.classList.contains(s)) || "stopped";
+    if (state === "disabled") return;
+
+    if (state === "stopped" || state === "panic") {
+      // ▶ Starten
+      const mode     = modeSel.value;
+      const interval = parseFloat(iv.value) || 60;
+      const body = {
+        mode, strategy: "scalp", interval,
+        max_eur:     parseFloat(eur.value) || 0,
+        max_runtime: (parseFloat(rt.value) || 0) * 60,
+      };
+      if (mode === "live") {
+        if (!$("liveAck").checked || $("liveConfirm").value.trim() !== "LIVE") {
+          $("runMsg").textContent = "Live abgebrochen: Häkchen setzen und LIVE eintippen.";
+          return;
+        }
+        if (!window.confirm("WIRKLICH live mit ECHTEM GELD starten?")) return;
+        body.confirm = "LIVE";
       }
-      if (!window.confirm("WIRKLICH live mit ECHTEM GELD starten?")) return;
-      body.confirm = "LIVE";
+      // Gelb zeigen während der API-Call läuft
+      tl.className = "tl-housing starting";
+      $("tlLabel").textContent = "Start…";
+      const r = await _postJSON("/api/run", body);
+      if (!r.ok) {
+        $("runMsg").textContent = "Start fehlgeschlagen: " + (r.error || "");
+        tl.className = "tl-housing stopped";
+        $("tlLabel").textContent = "Stopp";
+      }
+    } else {
+      // ■ Stoppen (graceful oder hart wenn draining)
+      const r = await _postJSON("/api/stop", {});
+      $("runMsg").textContent = (r && r.forcing)
+        ? "Hart-Stopp: laufende Trades werden NICHT mehr beendet (settle übernimmt)."
+        : "Stop: keine neuen Trades. Offene Positionen werden noch zu Ende geführt.";
     }
-    const r = await _postJSON("/api/run", body);
-    if (!r.ok) $("runMsg").textContent = "Start fehlgeschlagen: " + (r.error || "");
-    pollStatus();
-  });
-  $("stopBtn").addEventListener("click", async () => {
-    const r = await _postJSON("/api/stop", {});
-    $("runMsg").textContent = (r && r.forcing)
-      ? "Hart-Stopp: laufende Trades werden NICHT mehr beendet (settle übernimmt)."
-      : "Stop: keine neuen Trades. Offene Positionen werden noch zu Ende geführt.";
     pollStatus();
   });
 }
