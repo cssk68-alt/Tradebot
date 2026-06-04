@@ -84,6 +84,10 @@ class BrainManager(Agent):
                 rss_sources=report.rss_sources if report else 0,
                 reddit_sources=report.reddit_sources if report else 0,
                 risk_appetite=risk_appetite,
+                # The forecaster's <=2-sentence handoff (driver + main risk), carried
+                # on the Signal — lets the meta-controller judge the reasoning, not
+                # just the numbers.
+                forecast_context=sig.rationale,
             )
             if res is not None:
                 approved, reason = res

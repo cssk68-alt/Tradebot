@@ -1,6 +1,87 @@
 # Aktueller Stand
 
-Stand: 2026-06-03 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
+Stand: 2026-06-04 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
+
+## Kontext-Handoff, Brain-Feature, Presets + Log-Trennung (neu, 2026-06-04)
+
+Vier Sachen in einem Rutsch — Antwort auf „wir machen alle 3 Empfehlungen + Presets".
+
+### 1. Test-Log-Trennung
+- `llm/client.py`: Transcript-Pfad kommt aus `_llm_log_path()` und ist per Env-Var
+  **`TRADEBOT_LLM_LOG`** überschreibbar (pro Aufruf aufgelöst). `tests/conftest.py`
+  (neu) leitet das Log session-weit in ein Temp-File. Tests verschmutzen das echte
+  `data/llm_log.jsonl` nicht mehr (verifiziert: 2417 Zeilen vor/nach Testlauf).
+
+### 2. Numerisches Brain-Feature (Empfehlung 1)
+- Neues Feature **`sentiment_agreement`** (ml/features.py, ans Ende angehängt):
+  stimmen die *populierten* Kanäle RSS/Social/Web überein? 1.0 = Konsens, 0.0 =
+  Gegenextreme, 0.5 = nichts zu vergleichen. Ein **numerisches** Signal, das das
+  Brain wirklich verwerten kann (Text kann es nicht — es frisst nur Zahlen).
+- Schema: `FEATURE_DIM` 19→20, `BRAIN_FEATURE_DIM` 21→22. ⚠️ Folge: altes
+  `brain.npz` (21-dim) lädt nicht mehr → Cold-Start; alte Experiences werden vom
+  Drift-Guard übersprungen; XGBoost fällt bis ≥20 neue Trades auf die Heuristik.
+  **Empfehlung: einmal `reset --yes`** für eine saubere Basis.
+
+### 3. Strukturiertes Kontext-Feld forecast → BrainManager (Empfehlung 2)
+- Der Forecaster (`estimate_prob`) liefert sein `reason` jetzt als **≤2-Satz-Handoff**
+  (Haupttreiber + Hauptrisiko, für den Risk-Manager geschrieben). Es reitet auf dem
+  vorhandenen Return-Tuple → **keine Signaturänderung**, landet in `Signal.rationale`.
+- `BrainManager` reicht `sig.rationale` als neues `forecast_context` an
+  `decide_execution` weiter; dort wird es nur bei Inhalt als „Forecaster's note:"
+  an den User-Prompt gehängt (sonst byte-identisch wie vorher).
+- **`max_tokens` je Task +10%** (Puffer gegen abgeschnittenes JSON): sentiment
+  200→220, forecast 250→275, brainmanager 200→220, postmortem 250→275.
+
+### 4. Presets auf Seite 2 (Empfehlung 3 / „mehr Trades")
+- Freie Regler bleiben, plus **4 Modi**: ① **Frei** (eigene Werte) + 3 feste,
+  **evidenzbasierte** Setups (Opus-Web-Recherche, Quellen unten) — ② **Vorsichtig**,
+  ③ **Ausgewogen**, ④ **Lern-/Aggressiv**.
+- **Werte aus der Recherche** (Thorp/Ziemba zu Fractional Kelly, Polymarket-Fee/
+  Spread-Doku, Bandit/RL zum Cold-Start). Kernkorrektur: ④ bekommt die **kleinste**
+  Positionsgröße (0,15-Kelly, 0,5 % pro Trade), nicht die größte — „aggressiv" =
+  **lockere Gates** (3 pp Edge, niedriges Brain-Veto, Aggressivität 70 %) für viele
+  Trades, aber **winzige Einsätze**, um Lern-Daten ohne große Verluste zu „kaufen".
+  ② nutzt Viertel-Kelly/1 %/8 pp-Edge (Kapitalerhalt), ③ ≈0,4-Kelly/2 %/5 pp.
+- Klick auf ②③④ schreibt die Werte in alle Slider (außer **bankroll** — Kapital
+  bleibt). Jede manuelle Reglerbewegung springt zurück auf ① Frei. Die Auswahl wird
+  als `preset` in `data/config.json` gemerkt (Server-DEFAULTS; Settings ignoriert
+  den Key). `docs/settings.js` + `settings.html`. Slider-Untergrenze
+  „Max-Einsatz/Trade" 1 % → 0,5 % gesenkt, damit ④ darstellbar ist.
+- **Recherche-Quellen** u. a.: Kelly/Ziemba (Stochastic Optimization in Finance, ch.1),
+  Polymarket Fees & Liquidity-Rewards (docs.polymarket.com), QuantJourney Fee-Analyse,
+  Multi-Armed-Bandit/Exploration (gibberblot RL-Notes). Schwach belegt & als
+  Ermessens-Entscheid markiert: absolute USDC-Liquiditätsschwellen und `max_hold_seconds`
+  (an unsere Slider-Range angepasst statt der höheren Roh-Empfehlung).
+- **Vom Agenten zusätzlich empfohlen (noch NICHT umgesetzt):** Explorations-Budget mit
+  ε-Decay (8→~50 Trades), Tages-Verlustlimit (Circuit-Breaker), Maker-First-Execution
+  (Polymarket-Maker = 0 Fees), Edge-Shrinkage bei kaltem Brain, Tick-Size-Awareness.
+
+### Tests
+- **98 grün.** Neu: `tests/test_features.py` (5), `tests/conftest.py`, je +2 in
+  `test_llm_client.py` (Kontext-Feld) und +1 in `test_hardfail_and_settlement.py`
+  (Handoff), +2 Log-Isolation.
+
+## Graceful Stop: offene Trades werden fertig geführt (neu, 2026-06-04)
+
+**Problem:** Stop beendete den Loop und machte nur EINEN `manage_open`-Sweep. Im
+Scalp-Modus schließt der aber nur Positionen, die schon Take-Profit/Stop-Loss/
+Max-Hold erreicht haben — alle anderen blieben offen, und danach pollte niemand
+mehr die Preise. → Offene Trades „verliefen im Leeren".
+
+**Fix (`server.py`):** Stop löst jetzt eine **Wind-Down-Phase** aus
+(`_Runner._wind_down`): keine neuen Zyklen/Positionen mehr, aber die offenen
+Positionen werden weiter gepollt und geschlossen.
+- **Scalp:** Drain-Loop, bis das Buch leer ist — spätestens nach `max_hold_seconds`
+  (+ Sicherheits-Deadline), dann Übergabe an `settle`.
+- **Resolve:** ein Settle-Sweep; nicht auflösbare Positionen **persistieren** in der
+  DB für den `settle`-Poller (nicht force-geschlossen, nicht verloren).
+- Gilt auch beim Erreichen von Budget-/Laufzeit-Limit (kein Abandon mehr).
+- **Zweiter Stop-Klick** während des Wind-Downs = **Hart-Abbruch** (`_force`),
+  Rest geht an `settle`.
+- Frontend: Badge „beende offene Trades …", Stop-Button wird zu „■ Sofort
+  abbrechen", ehrliche Meldungstexte (`docs/app.js`).
+- Tests: `tests/test_wind_down.py` (4) — drain-bis-leer, resolve-Übergabe,
+  Hart-Abbruch, Stop-Semantik. Kein echtes Sleep/Netz.
 
 ## Mehr Trades: Risk-Adjuster + freie Social-Quellen + Slider-Persistenz (neu, 2026-06-03)
 
@@ -48,7 +129,8 @@ plus ein Reset auf null.
   nur aus neuen, echten Ergebnissen. (Das `manager_decisions`-Audit bleibt bewusst.)
 
 ### Tests
-- **84 grün** (1 Warnung). Neu: `tests/test_adjuster.py` (6), `tests/test_social.py` (5).
+- **88 grün** (1 Warnung). Neu in dieser Runde: `tests/test_adjuster.py` (6),
+  `tests/test_social.py` (5), `tests/test_wind_down.py` (4).
 
 ## Live-Verifikation mit Netz + DeepSeek (neu, 2026-06-03)
 

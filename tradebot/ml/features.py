@@ -26,6 +26,10 @@ FEATURE_NAMES = [
     "source_quality",
     # web search + hard-fact prior (live crypto price / bookmaker odds)
     "web_sentiment", "web_log_sources", "fact_prob", "fact_confidence",
+    # cross-source agreement: do the populated sentiment channels point the same
+    # way? A NUMERIC signal the brain can learn to trust (consensus) or distrust
+    # (channels contradict each other). Appended last so existing indices are kept.
+    "sentiment_agreement",
 ]
 FEATURE_DIM = len(FEATURE_NAMES)
 
@@ -53,6 +57,18 @@ def build_features(
     web_sources = report.web_sources if report else 0
     fact_prob = report.fact_prob if (report and report.fact_prob is not None) else 0.5
     fact_confidence = report.fact_confidence if report else 0.0
+    # Cross-source agreement in [0, 1]: 1.0 when the populated channels (RSS /
+    # social / web) point the same way, 0.0 when two of them sit at opposite
+    # extremes. Neutral 0.5 when fewer than two channels carry data (nothing to
+    # compare). This lets the brain weight a consensus higher than a lone source.
+    active = [
+        v for v, n in (
+            (rss_sentiment, rss_sources),
+            (reddit_sentiment, reddit_sources),
+            (web_sentiment, web_sources),
+        ) if n > 0
+    ]
+    sentiment_agreement = 1.0 - (max(active) - min(active)) / 2.0 if len(active) >= 2 else 0.5
     days = market.days_to_resolution()
     return [
         market.yes_price,
@@ -74,6 +90,7 @@ def build_features(
         math.log1p(max(0, web_sources)) / 4.0,
         fact_prob,
         fact_confidence,
+        sentiment_agreement,
     ]
 
 

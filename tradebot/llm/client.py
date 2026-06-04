@@ -14,9 +14,11 @@ is a pure config change with no logic difference.
 from __future__ import annotations
 
 import json
+import os
 import threading
 from abc import ABC, abstractmethod
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from tradebot.config import DATA_DIR
@@ -25,8 +27,19 @@ from tradebot.log import get_logger
 # Full transcript of every model call (exact prompt + answer + token use), one
 # JSON object per line, so the otherwise-invisible LLM conversation is auditable
 # after the fact. The console shows only a short one-liner; this file has it all.
-_LLM_LOG_PATH = DATA_DIR / "llm_log.jsonl"
 _LLM_LOG_LOCK = threading.Lock()
+
+
+def _llm_log_path() -> Path:
+    """Where the full LLM transcript is written.
+
+    Defaults to ``data/llm_log.jsonl`` but can be redirected with the
+    ``TRADEBOT_LLM_LOG`` env var, so test runs (see ``tests/conftest.py``) write to
+    a throwaway file instead of polluting the real production log. Resolved per
+    call — not cached at import — so the override always wins regardless of import
+    order."""
+    override = os.environ.get("TRADEBOT_LLM_LOG", "").strip()
+    return Path(override) if override else (DATA_DIR / "llm_log.jsonl")
 
 
 def _ascii(s: str) -> str:
@@ -89,7 +102,8 @@ class LLMClient(ABC):
 
         # File: the complete, machine-readable record (UTF-8, untruncated).
         try:
-            _LLM_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            path = _llm_log_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
             record = {
                 "ts": datetime.now().isoformat(timespec="seconds"),
                 "task": task,
@@ -101,7 +115,7 @@ class LLMClient(ABC):
                 "user": user,
                 "answer": out,
             }
-            with _LLM_LOG_LOCK, open(_LLM_LOG_PATH, "a", encoding="utf-8") as f:
+            with _LLM_LOG_LOCK, open(path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except Exception:
             pass
@@ -125,7 +139,7 @@ class LLMClient(ABC):
             "You are a market sentiment analyst. Respond ONLY with compact JSON "
             '{"sentiment": <float -1..1>, "narrative": "<one sentence>"}.',
             f"Market: {question}\nSources:\n{joined}",
-            max_tokens=200, task="sentiment", ctx=question,
+            max_tokens=220, task="sentiment", ctx=question,
         )
         if not out:
             return None
@@ -136,12 +150,18 @@ class LLMClient(ABC):
             return None
 
     def estimate_prob(self, question: str, narrative: str, market_price: float, lessons: str):
+        # ``reason`` is repurposed as a SHORT structured handoff to the BrainManager
+        # (Stage 5): <=2 sentences naming the main driver and the main risk, so the
+        # risk meta-controller decides on the forecaster's actual reasoning, not just
+        # the numbers. It rides the existing return tuple -> no signature change.
         out = self._complete_logged(
             "You are a calibrated forecaster for binary prediction markets. Respond ONLY "
-            'with JSON {"prob": <0..1>, "confidence": <0..1>, "reason": "<short>"}.',
+            'with JSON {"prob": <0..1>, "confidence": <0..1>, "reason": "<=2 sentences: the '
+            'single biggest driver of your estimate AND the main risk to it, written for the '
+            'downstream risk manager to act on"}.',
             f"Question: {question}\nMarket-implied YES prob: {market_price:.2f}\n"
             f"Narrative: {narrative}\nPast lessons:\n{lessons}",
-            max_tokens=250, task="forecast", ctx=question,
+            max_tokens=275, task="forecast", ctx=question,
         )
         if not out:
             return None
@@ -167,6 +187,7 @@ class LLMClient(ABC):
         rss_sources: int,
         reddit_sources: int,
         risk_appetite: str = "",
+        forecast_context: str = "",
     ) -> Optional[tuple[bool, str]]:
         """BrainManager (Stage 5): final approve/veto verdict on a trade.
 
@@ -177,7 +198,12 @@ class LLMClient(ABC):
         ``risk_appetite`` is the operator's Risk-Adjuster 'Ping' (see
         risk/adjuster.py): a free-text instruction appended to the system prompt
         that tells the agent how bold to be. Empty string == today's default
-        (conservative) behaviour, so the prompt is unchanged when the knob is 0."""
+        (conservative) behaviour, so the prompt is unchanged when the knob is 0.
+
+        ``forecast_context`` is the forecaster's <=2-sentence handoff (its ``reason``):
+        the main driver + main risk. Appended to the user prompt only when present,
+        so the agent can judge the actual reasoning, not just the numbers. Empty
+        string keeps the prompt byte-identical to before."""
         side = "YES" if is_yes else "NO"
         system = (
             "You are the BrainManager, the final risk meta-controller for a prediction-market "
@@ -191,16 +217,17 @@ class LLMClient(ABC):
         )
         if risk_appetite:
             system += " " + risk_appetite
-        out = self._complete_logged(
-            system,
+        user = (
             f"Traded side: {side}\n"
             f"XGBoost P(YES): {model_prob:.3f}\n"
             f"MLP veto score: {brain_score:.3f}\n"
             f"Executable edge: {edge:+.3f}\n"
             f"RSS sentiment: {rss_sentiment:+.2f} from {rss_sources} sources\n"
-            f"Social sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources",
-            max_tokens=200, task="brainmanager", ctx=question,
+            f"Social sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources"
         )
+        if forecast_context:
+            user += f"\nForecaster's note: {forecast_context}"
+        out = self._complete_logged(system, user, max_tokens=220, task="brainmanager", ctx=question)
         if not out:
             return None
         try:
@@ -215,7 +242,7 @@ class LLMClient(ABC):
             "trade postmortem. Identify the single biggest lesson. Respond ONLY with JSON "
             '{"category":"<word>","cause":"<short>","recommendation":"<short>"}.',
             trade_desc,
-            max_tokens=250, task="postmortem", ctx=trade_desc[:60],
+            max_tokens=275, task="postmortem", ctx=trade_desc[:60],
         )
         if not out:
             return None

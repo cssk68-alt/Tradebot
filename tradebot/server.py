@@ -43,6 +43,10 @@ DEFAULTS: dict = {
     "run_interval": 60.0,        # seconds between cycles
     "run_max_eur": 1.0,          # euro budget cap (0 = unlimited)
     "run_max_runtime_min": 60.0,  # total runtime cap in MINUTES (0 = unlimited)
+    # Which Seite-2 preset is active ("frei" = free sliders, else a named preset).
+    # Purely a UI bookmark so the highlight survives a reload; the slider VALUES
+    # remain the single source of truth, and Settings ignores this unknown key.
+    "preset": "frei",
 }
 
 
@@ -83,6 +87,7 @@ class _Runner:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._force = threading.Event()  # 2nd Stop while winding down = hard abort
         self.mode = ""
         self.strategy = ""
         self.interval = 60.0
@@ -94,6 +99,7 @@ class _Runner:
         self.max_eur = 0.0
         self.max_runtime = 0.0
         self.stop_reason = ""
+        self.draining = False  # winding down: finishing open trades, opening none
 
     @property
     def running(self) -> bool:
@@ -105,7 +111,7 @@ class _Runner:
             "cycle": self.cycle, "last": self.last, "error": self.error,
             "started_at": self.started_at, "cost": round(self.cost, 4),
             "max_eur": self.max_eur, "max_runtime": self.max_runtime,
-            "stop_reason": self.stop_reason,
+            "stop_reason": self.stop_reason, "draining": self.draining,
         }
 
     def start(self, mode: str, strategy: str, interval: float, confirm: str,
@@ -119,6 +125,8 @@ class _Runner:
             if mode == "live" and confirm != "LIVE":
                 return {"ok": False, "error": "Live erfordert confirm=LIVE"}
             self._stop.clear()
+            self._force.clear()
+            self.draining = False
             self.mode, self.strategy = mode, strategy or "scalp"
             self.interval = max(5.0, float(interval))
             self.max_eur = max(0.0, float(max_eur))         # 0 = unbegrenzt
@@ -133,6 +141,12 @@ class _Runner:
             return {"ok": True, **self.status()}
 
     def stop(self) -> dict:
+        # First Stop = graceful: stop opening new trades, but let the open ones
+        # finish (see _wind_down). A second Stop *while winding down* forces a hard
+        # abort, leaving any still-open trades to the `settle` poller.
+        if self.draining:
+            self._force.set()
+            return {"ok": True, "forcing": True}
         self._stop.set()
         return {"ok": True, "stopping": True}
 
@@ -165,14 +179,76 @@ class _Runner:
                 self.cost = orch.client.cost_eur
                 self.last = f"Zyklus {self.cycle}: {len(placed)} Trade(s), €{self.cost:.4f}"
                 self._stop.wait(self.interval)
-            try:
-                orch.manage_open(orch.exchange.list_markets())  # final sweep on stop
-            except Exception:
-                pass
+            # Stop / cap reached: don't abandon live positions — wind down (open
+            # nothing new, but keep closing the open ones until the book is flat).
+            self._wind_down(orch, log)
         except Exception as e:
             self.error = f"{type(e).__name__}: {e}"
         finally:
             self._stop.set()
+
+    def _wind_down(self, orch, log) -> None:
+        """Graceful Stop: open NO new positions, but let the OPEN ones finish.
+
+        A Stop (or a hit budget/runtime cap) must never abandon a live position.
+        Scalp trades exit on price (take-profit / stop-loss / max-hold), so they
+        need active polling: keep calling ``manage_open`` — opening nothing new —
+        until the book is flat or a safety deadline (max_hold + margin) passes.
+        Resolve trades settle only at the real market resolution (days away): one
+        settle sweep, then they stay in the DB for the ``settle`` poller — they are
+        persisted, never lost. A second Stop while winding down sets ``_force`` and
+        aborts this hard, handing any leftovers to ``settle`` too."""
+        import time as _t
+
+        self.draining = True
+        try:
+            strategy = getattr(orch.settings, "strategy", self.strategy or "scalp")
+
+            def _sweep() -> int:
+                try:
+                    orch.manage_open(orch.exchange.list_markets())
+                except Exception as e:  # never let a sweep crash the wind-down
+                    log.warning("wind-down manage_open failed: %s", e)
+                self.cost = orch.client.cost_eur
+                return len(orch.store.open_trades(orch.mode))
+
+            open_left = _sweep()
+
+            if strategy != "scalp":
+                # resolve: can't force-close before the market resolves; the open
+                # trades persist in the DB for the settle poller — not abandoned.
+                self.last = f"Gestoppt — {open_left} offene Trade(s) warten auf Resolution"
+                self.stop_reason = (self.stop_reason or "Gestoppt") + (
+                    f" — {open_left} offene Trade(s) an settle-Poller uebergeben"
+                    if open_left else " — keine offenen Trades"
+                )
+                return
+
+            # scalp: actively drain until flat or the safety deadline. A scalp
+            # position closes within max_hold_seconds at the latest, so this is
+            # bounded; the margin covers the final poll + settlement.
+            deadline = _t.time() + float(getattr(orch.settings, "max_hold_seconds", 300.0)) + 120.0
+            poll = max(5.0, min(self.interval, 30.0))
+            while open_left and not self._force.is_set():
+                self.last = f"Beende offene Trades … {open_left} noch offen"
+                if _t.time() >= deadline:
+                    self.stop_reason = (self.stop_reason or "Gestoppt") + (
+                        f" — Zeitlimit, {open_left} Trade(s) noch offen (settle uebernimmt)"
+                    )
+                    return
+                self._force.wait(poll)
+                open_left = _sweep()
+
+            if self._force.is_set() and open_left:
+                self.last = f"Hart gestoppt — {open_left} Trade(s) offen"
+                self.stop_reason = (self.stop_reason or "Gestoppt") + (
+                    f" — hart abgebrochen, {open_left} Trade(s) offen (settle uebernimmt)"
+                )
+            else:
+                self.last = "Alle offenen Trades beendet"
+                self.stop_reason = (self.stop_reason or "Gestoppt") + " — alle offenen Trades beendet"
+        finally:
+            self.draining = False
 
 
 RUNNER = _Runner()

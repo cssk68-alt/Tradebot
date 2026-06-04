@@ -300,6 +300,29 @@ def test_manager_vetoes_and_records(tmp_path):
     assert row["approved"] == 0
 
 
+class _CaptureClient:
+    available = True
+
+    def __init__(self):
+        self.kw = None
+
+    def decide_execution(self, **kw):
+        self.kw = kw
+        return True, "ok"
+
+
+def test_manager_passes_forecast_context(tmp_path):
+    # The forecaster's reasoning (Signal.rationale) must reach the BrainManager as
+    # forecast_context, so the meta-controller judges the reasoning, not just numbers.
+    s = _settings(tmp_path)
+    cap = _CaptureClient()
+    mgr = BrainManager(s, Store(s.db_path), log, cap)
+    sig = _signal()
+    sig.rationale = "main driver: poll lead; risk: low turnout"
+    mgr.run([sig], {"m": ResearchReport(market_id="m")})
+    assert cap.kw["forecast_context"] == "main driver: poll lead; risk: low turnout"
+
+
 def test_manager_fails_closed_on_unparseable_llm(tmp_path):
     s = _settings(tmp_path)
     store = Store(s.db_path)

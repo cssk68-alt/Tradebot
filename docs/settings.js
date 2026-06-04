@@ -48,7 +48,7 @@ const SETTINGS = [
     key: "max_trade_pct",
     label: "Maximaler Einsatz pro Trade",
     unit: "%",
-    min: 1, max: 20, step: 0.5,
+    min: 0.5, max: 20, step: 0.5,
     defaultStored: 0.05,
     isPct: true,
     desc: [
@@ -256,6 +256,98 @@ const SETTINGS = [
   }
 ];
 
+// --- Presets: 1 frei wählbar ("frei") + 3 feste, empfohlene Setups. -----------
+// Werte sind STORED-Werte (nicht Anzeige-Einheiten) und treffen die SETTINGS-Keys.
+// `bankroll` fehlt absichtlich — ein Preset darf nie dein Kapital überschreiben.
+//
+// EVIDENZBASIERT (Opus-Web-Recherche, 2026-06-04). Kernbefunde:
+//  - Fractional Kelly: Viertel- bis Halb-Kelly; Full-Kelly überwettet bei
+//    Schätzfehlern massiv (Thorp/Ziemba/MacLean).
+//  - Einsatz pro Trade 1–2 % der Bankroll; Scalping eher Richtung 0,5 %.
+//  - Auf Polymarket ist der SPREAD (1–8¢) der dominante Kostenfaktor → die Edge
+//    muss Spread + Fees + Slippage schlagen, bevor ein Trade +EV ist.
+//  - Cold-Start (Bandit/RL): explorieren mit GEDECKELTEM Downside → der Aggressiv-
+//    Modus lockert die GATES (Edge/Konfidenz/Veto = mehr Trades), hält den EINSATZ
+//    aber am KLEINSTEN (kleinster Kelly + kleinster max_trade), um Lern-Daten zu
+//    „kaufen" ohne große Verluste.
+const PRESETS = {
+  vorsichtig: {
+    aggressiveness: 0.0, kelly_fraction: 0.25, max_trade_pct: 0.01, max_exposure_pct: 0.10,
+    min_liquidity: 3000, min_volume_24h: 5000, edge_threshold: 0.08, confidence_threshold: 0.65,
+    brain_weight: 0.30, brain_veto_threshold: 0.40, max_slippage: 0.01,
+    min_days_to_resolution: 1.0, max_days_to_resolution: 30, take_profit: 0.03, stop_loss: 0.045,
+    min_net_profit: 0.015, max_hold_seconds: 300,
+  },
+  ausgewogen: {
+    aggressiveness: 0.30, kelly_fraction: 0.40, max_trade_pct: 0.02, max_exposure_pct: 0.25,
+    min_liquidity: 1500, min_volume_24h: 2500, edge_threshold: 0.05, confidence_threshold: 0.60,
+    brain_weight: 0.30, brain_veto_threshold: 0.30, max_slippage: 0.02,
+    min_days_to_resolution: 1.0, max_days_to_resolution: 30, take_profit: 0.04, stop_loss: 0.06,
+    min_net_profit: 0.01, max_hold_seconds: 450,
+  },
+  aggressiv: {
+    // Lockere GATES (viele Trades), aber KLEINSTER Einsatz (Exploration mit
+    // gedeckeltem Downside) — bewusst temporär, bis das Brain ≥8 Ergebnisse hat.
+    aggressiveness: 0.70, kelly_fraction: 0.15, max_trade_pct: 0.005, max_exposure_pct: 0.20,
+    min_liquidity: 800, min_volume_24h: 1500, edge_threshold: 0.03, confidence_threshold: 0.55,
+    brain_weight: 0.10, brain_veto_threshold: 0.10, max_slippage: 0.02,
+    min_days_to_resolution: 0.5, max_days_to_resolution: 30, take_profit: 0.02, stop_loss: 0.03,
+    min_net_profit: 0.005, max_hold_seconds: 600,
+  },
+};
+
+const PRESET_BUTTONS = [
+  { key: "frei", label: "① Frei", sub: "eigene Regler",
+    title: "Die Regler bleiben wie eingestellt — du bestimmst jeden Wert selbst." },
+  { key: "vorsichtig", label: "② Vorsichtig", sub: "Qualität vor Menge",
+    title: "Viertel-Kelly, 1% pro Trade, hohe Edge-Hürde (8pp), strenge Liquidität, Brain-Veto aktiv. Wenige, aber hochwertige Trades — Kapitalerhalt." },
+  { key: "ausgewogen", label: "③ Ausgewogen", sub: "Standard",
+    title: "≈0,4-Kelly, 2% pro Trade, 5pp Edge. Mittlere Schwellen — der empfohlene Allround-Startpunkt." },
+  { key: "aggressiv", label: "④ Lern-/Aggressiv", sub: "viele winzige Trades",
+    title: "Lockere GATES (3pp Edge, niedriges Brain-Veto, Aggressivität 70%) für VIELE Trades — aber KLEINSTER Einsatz (0,15-Kelly, 0,5% pro Trade), damit die Cold-Start-Exploration keine großen Verluste baut. Bewusst temporär, bis das Brain ≥8 Ergebnisse hat." },
+];
+
+let activePreset = "frei";
+
+function renderPresetBar() {
+  const bar = document.getElementById("presetBar");
+  if (!bar) return;
+  bar.innerHTML =
+    `<div class="preset-intro"><strong>Voreinstellungen.</strong> Wähle ein fertiges Setup ` +
+    `oder stelle frei ein. Sobald du einen Regler bewegst, springt die Auswahl auf „Frei".</div>` +
+    `<div class="preset-btns">` +
+    PRESET_BUTTONS.map((b) =>
+      `<button type="button" class="preset-btn${b.key === activePreset ? " active" : ""}" ` +
+      `data-preset="${b.key}" title="${b.title}" onclick="onPreset('${b.key}')">` +
+      `<span class="preset-name">${b.label}</span><span class="preset-sub">${b.sub}</span></button>`
+    ).join("") +
+    `</div>`;
+}
+
+function onPreset(name) {
+  // Frei = nur Auswahl markieren; ein festes Preset schreibt seine Werte in alle
+  // passenden Slider (Keys, die es nicht kennt — z.B. bankroll — bleiben unberührt).
+  if (name !== "frei" && PRESETS[name]) {
+    const p = PRESETS[name];
+    for (const s of SETTINGS) {
+      if (p[s.key] === undefined) continue;
+      const slider = document.getElementById(`slider-${s.key}`);
+      if (!slider) continue;
+      const dispVal = toDisplay(p[s.key], s);
+      slider.value = dispVal;
+      document.getElementById(`val-${s.key}`).textContent = fmt(dispVal, s) + s.unit;
+      slider.style.setProperty("--fill", fillPct(dispVal, s));
+    }
+  }
+  setActivePreset(name);
+}
+
+function setActivePreset(name) {
+  activePreset = name;
+  document.querySelectorAll(".preset-btn").forEach((btn) =>
+    btn.classList.toggle("active", btn.dataset.preset === name));
+}
+
 let currentConfig = {};
 
 function fmt(val, s) {
@@ -286,7 +378,10 @@ async function loadConfig() {
     document.getElementById("serverWarning").style.display = "block";
     currentConfig = {};
   }
+  const known = ["frei", ...Object.keys(PRESETS)];
+  activePreset = known.includes(currentConfig.preset) ? currentConfig.preset : "frei";
   renderSettings();
+  renderPresetBar();
 }
 
 function renderSettings() {
@@ -331,6 +426,8 @@ function onSlide(key, rawVal) {
   document.getElementById(`val-${key}`).textContent = fmt(dispVal, s) + s.unit;
   const slider = document.getElementById(`slider-${key}`);
   slider.style.setProperty("--fill", fillPct(dispVal, s));
+  // Any manual move means the config no longer matches a fixed preset -> "Frei".
+  setActivePreset("frei");
 }
 
 async function saveConfig() {
@@ -339,6 +436,7 @@ async function saveConfig() {
     const slider = document.getElementById(`slider-${s.key}`);
     config[s.key] = toStored(parseFloat(slider.value), s);
   }
+  config.preset = activePreset;  // remember the UI choice (slider values stay source of truth)
 
   const msg = document.getElementById("saveMsg");
   try {

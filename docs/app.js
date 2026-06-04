@@ -130,14 +130,19 @@ async function _postJSON(path, body) {
 function renderRunStatus(st) {
   const badge = $("runStatus");
   const running = !!(st && st.running);
+  const draining = !!(st && st.draining);
   const eur = st && st.cost ? ` · €${Number(st.cost).toFixed(4)}` : "";
-  badge.textContent = running
+  badge.textContent = draining
+    ? `beende offene Trades …${eur}`
+    : running
     ? `running · ${st.mode} · Zyklus ${st.cycle}${eur}`
     : (st && st.error ? "Fehler" : "idle");
   badge.className = "badge " + (running ? (st.mode === "live" ? "live" : "paper") : "");
   const start = $("startBtn"), stop = $("stopBtn");
-  start.disabled = running;
+  start.disabled = running;            // no new run while one is still winding down
   stop.disabled = !running;
+  // While winding down the Stop button becomes a hard-abort (skips finishing).
+  stop.textContent = draining ? "■ Sofort abbrechen" : "■ Stop";
   start.style.opacity = running ? 0.5 : 1;
   stop.style.opacity = running ? 1 : 0.5;
   $("runMsg").textContent = (st && st.error)
@@ -221,8 +226,10 @@ function wireControls() {
     pollStatus();
   });
   $("stopBtn").addEventListener("click", async () => {
-    await _postJSON("/api/stop", {});
-    $("runMsg").textContent = "Stop angefordert — endet nach dem laufenden Zyklus.";
+    const r = await _postJSON("/api/stop", {});
+    $("runMsg").textContent = (r && r.forcing)
+      ? "Hart-Stopp: laufende Trades werden NICHT mehr beendet (settle übernimmt)."
+      : "Stop: keine neuen Trades. Offene Positionen werden noch zu Ende geführt.";
     pollStatus();
   });
 }

@@ -64,6 +64,26 @@ def test_decide_execution_parses():
     assert approved is False and "opposes" in reason
 
 
+def test_decide_execution_appends_forecast_context_when_present():
+    c = _FakeLLM('{"approved": true, "reason": "consistent"}')
+    c.decide_execution(
+        question="q", is_yes=True, model_prob=0.6, brain_score=0.5, edge=0.1,
+        rss_sentiment=0.0, reddit_sentiment=0.0, rss_sources=0, reddit_sources=0,
+        forecast_context="driver: poll lead; risk: low turnout",
+    )
+    user = c.calls[-1][1]
+    assert "Forecaster's note: driver: poll lead; risk: low turnout" in user
+
+
+def test_decide_execution_omits_note_when_no_context():
+    c = _FakeLLM('{"approved": true, "reason": "ok"}')
+    c.decide_execution(
+        question="q", is_yes=True, model_prob=0.6, brain_score=0.5, edge=0.1,
+        rss_sentiment=0.0, reddit_sentiment=0.0, rss_sources=0, reddit_sources=0,
+    )
+    assert "Forecaster's note" not in c.calls[-1][1]
+
+
 def test_postmortem_parses():
     c = _FakeLLM('{"category": "risk", "cause": "thin edge", "recommendation": "wait"}')
     cat, cause, rec = c.postmortem("trade desc")
@@ -159,6 +179,32 @@ def test_deepseek_transport_failure_returns_none(monkeypatch):
     monkeypatch.setattr(deepseek_mod.httpx, "post", boom)
     c = DeepSeekClient(api_key="ds-test")
     assert c.sentiment("q", ["a"]) is None
+
+
+# --- log isolation: transcript honours the TRADEBOT_LLM_LOG override ---
+
+def test_llm_log_redirects_to_override(monkeypatch, tmp_path):
+    import json as _json
+
+    from tradebot.llm import client as client_mod
+
+    target = tmp_path / "redirected.jsonl"
+    monkeypatch.setenv("TRADEBOT_LLM_LOG", str(target))
+    assert client_mod._llm_log_path() == target
+
+    _FakeLLM('{"sentiment": 0.1, "narrative": "x"}').sentiment("Will X?", ["a"])
+
+    assert target.exists()
+    rec = _json.loads(target.read_text(encoding="utf-8").splitlines()[0])
+    assert rec["task"] == "sentiment" and rec["answer"]
+
+
+def test_llm_log_defaults_to_data_dir_without_override(monkeypatch):
+    from tradebot.config import DATA_DIR
+    from tradebot.llm import client as client_mod
+
+    monkeypatch.delenv("TRADEBOT_LLM_LOG", raising=False)
+    assert client_mod._llm_log_path() == DATA_DIR / "llm_log.jsonl"
 
 
 # --- orchestrator hard-fail: no agent -> raise before doing anything ---
