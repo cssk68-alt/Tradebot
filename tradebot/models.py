@@ -171,6 +171,38 @@ class Experience(BaseModel):
     pnl: float
     mode: Mode
     is_yes: bool = True  # traded side — the brain needs it to learn P(trade wins)
+    # True when this row is a COUNTERFACTUAL (a veto/mirror replayed over the real
+    # price path), not a trade the bot actually executed. Lets validation/dashboard
+    # separate self-selected trades from counterfactual learning data.
+    is_counterfactual: bool = False
+
+
+class Counterfactual(BaseModel):
+    """A trade the bot did NOT execute (vetoed, sized-out, or the opposite/mirror
+    side of a real trade), tracked so the brain can later learn what WOULD have
+    happened over our short scalp window — replayed against the real price path
+    in ``snapshots`` (no simulated outcome; only the position is hypothetical)."""
+
+    id: Optional[int] = None
+    market_id: str
+    is_yes: bool
+    entry_price: float  # the traded SIDE price at signal time (yes or 1-yes)
+    entry_ts: datetime
+    edge: float = 0.0
+    brain_score: float = 0.5
+    features: list[float] = Field(default_factory=list)
+    source: str = "veto"  # "veto" (own side we blocked) | "mirror" (opposite side)
+    reason: str = ""  # why it was not traded (veto/size reason) — for the scoreboard
+    take_profit: float = 0.02
+    stop_loss: float = 0.03
+    max_hold: float = 300.0
+    status: str = "pending"  # "pending" | "settled" | "expired"
+    exit_price: Optional[float] = None
+    pnl: float = 0.0
+    won: Optional[bool] = None
+    exit_reason: str = ""  # "take_profit" | "stop_loss" | "time"
+    settled_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Lesson(BaseModel):

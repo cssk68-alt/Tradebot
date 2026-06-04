@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-04T02:15:01.517703+00:00",
+  "generated_at": "2026-06-04T08:02:27.529482+00:00",
   "mode": "paper",
   "starting_bankroll": 1000.0,
   "bankroll": 1000.0,
@@ -26,6 +26,25 @@
     "recommended": 600.0,
     "direction": "keep",
     "message": "Zu wenig abgeschlossene Scalp-Trades fuer eine Haltedauer-Empfehlung (0/8, davon 0 Gewinner)."
+  },
+  "brain_diagnostics": {
+    "oos": {
+      "status": "insufficient",
+      "n_train": 0,
+      "n_test": 0
+    },
+    "feature_importance": [],
+    "counterfactuals": {
+      "pending": 0,
+      "settled": 0,
+      "brain_right": 0,
+      "brain_wrong": 0
+    },
+    "experiences": {
+      "real": 0,
+      "counterfactual": 0,
+      "total": 0
+    }
   },
   "circuit_breaker": {
     "tripped": false,

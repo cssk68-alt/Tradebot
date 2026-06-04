@@ -112,7 +112,7 @@ def reset(
     store = Store(s.db_path)
     store.conn.executescript(
         "DELETE FROM trades; DELETE FROM experiences; DELETE FROM lessons; "
-        "DELETE FROM snapshots; DELETE FROM manager_decisions;"
+        "DELETE FROM snapshots; DELETE FROM manager_decisions; DELETE FROM counterfactuals;"
     )
     store.conn.commit()
     bp = Path(s.brain_path)
@@ -165,6 +165,41 @@ def settle(
         _time.sleep(interval)
 
 
+@app.command("brain-report")
+def brain_report():
+    """Print brain validation: out-of-sample metrics, feature importance, veto scoreboard."""
+    from tradebot.brain.feedback import Brain
+    from tradebot.store.db import Store
+
+    s = get_settings()
+    store = Store(s.db_path)
+    brain = Brain(s.brain_path, log, l2=float(getattr(s, "brain_l2", 0.0)))
+    exps = store.load_experiences()
+    diag = brain.diagnostics(exps)
+    cf = store.counterfactual_stats()
+    real = sum(1 for e in exps if not e.is_counterfactual)
+
+    log.info("Experiences: %d total (%d real, %d counterfactual)", len(exps), real, len(exps) - real)
+    oos = diag.get("oos", {})
+    if oos.get("status") == "ok":
+        log.info(
+            "Out-of-sample: acc %.3f | logloss %.3f | AUC %.3f (train %d / test %d)",
+            oos["accuracy"], oos["logloss"], oos["auc"], oos["n_train"], oos["n_test"],
+        )
+    else:
+        log.info("Out-of-sample: insufficient data (train %s / test %s)",
+                 oos.get("n_train"), oos.get("n_test"))
+    imp = diag.get("feature_importance", [])
+    if imp:
+        log.info("Top features (permutation importance):")
+        for f in imp:
+            log.info("  %-22s %+.4f", f["name"], f["importance"])
+    log.info(
+        "Veto scoreboard: %d settled | %d vetos right (would have lost) / %d too strict (would have won) | %d pending",
+        cf["settled"], cf["brain_right"], cf["brain_wrong"], cf["pending"],
+    )
+
+
 @app.command()
 def export(out: str = typer.Option(None, help="output path for the dashboard state.json")):
     """Write the dashboard snapshot (docs/dashboard/state.json) from the current DB."""
@@ -174,7 +209,7 @@ def export(out: str = typer.Option(None, help="output path for the dashboard sta
 
     s = get_settings()
     store = Store(s.db_path)
-    brain = Brain(s.brain_path, log)
+    brain = Brain(s.brain_path, log, l2=float(getattr(s, "brain_l2", 0.0)))
     path = export_state(store, s, brain, out or s.dashboard_path)
     log.info("Wrote dashboard state to %s", path)
 

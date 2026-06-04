@@ -42,7 +42,10 @@ class NeuralBrain:
         _, _, out = self._forward(self._norm(X))
         return float(min(1.0, max(0.0, out[0, 0])))
 
-    def train(self, X: list[list[float]], y: list[int], epochs: int = 400, lr: float = 0.05) -> bool:
+    def train(
+        self, X: list[list[float]], y: list[int],
+        epochs: int = 400, lr: float = 0.05, l2: float = 0.0,
+    ) -> bool:
         if len(y) < 8 or len(set(y)) < 2:
             return False
         Xa = np.array(X, dtype=float)
@@ -56,11 +59,13 @@ class NeuralBrain:
         for _ in range(epochs):
             z1, a1, out = self._forward(Xn)
             d2 = (out - ya) / n  # gradient of BCE wrt z2 (sigmoid)
-            dw2 = a1.T @ d2
+            # L2 weight decay on the WEIGHTS only (not biases): shrinks noise-feature
+            # weights toward 0 so the net learns which features matter + generalizes.
+            dw2 = a1.T @ d2 + l2 * self.w2
             db2 = d2.sum(axis=0)
             da1 = d2 @ self.w2.T
             dz1 = da1 * (z1 > 0)
-            dw1 = Xn.T @ dz1
+            dw1 = Xn.T @ dz1 + l2 * self.w1
             db1 = dz1.sum(axis=0)
             self.w2 -= lr * dw2
             self.b2 -= lr * db2
@@ -122,7 +127,10 @@ class TorchBrain:
             p = t.sigmoid(self.net(x)).item()
         return float(min(1.0, max(0.0, p)))
 
-    def train(self, X: list[list[float]], y: list[int], epochs: int = 400, lr: float = 0.05) -> bool:
+    def train(
+        self, X: list[list[float]], y: list[int],
+        epochs: int = 400, lr: float = 0.05, l2: float = 0.0,
+    ) -> bool:
         if len(y) < 8 or len(set(y)) < 2:
             return False
         t = self.torch
@@ -133,7 +141,8 @@ class TorchBrain:
         self.sd = Xa.std(axis=0) + 1e-6
         xt = t.tensor(self._norm(Xa), dtype=t.float32)
         yt = t.tensor(np.array(y, dtype=float).reshape(-1, 1), dtype=t.float32)
-        opt = t.optim.Adam(self.net.parameters(), lr=lr)
+        # weight_decay == L2 regularization (Problem 2: flexible feature weighting).
+        opt = t.optim.Adam(self.net.parameters(), lr=lr, weight_decay=l2)
         loss_fn = t.nn.BCEWithLogitsLoss()
         for _ in range(epochs):
             opt.zero_grad()

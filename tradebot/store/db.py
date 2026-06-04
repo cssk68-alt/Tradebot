@@ -11,11 +11,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from tradebot.models import Experience, Lesson, ManagerDecision, Mode, Side, Trade
+from tradebot.models import (
+    Counterfactual,
+    Experience,
+    Lesson,
+    ManagerDecision,
+    Mode,
+    Side,
+    Trade,
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS snapshots (
-    market_id TEXT, yes_price REAL, ts TEXT
+    market_id TEXT, yes_price REAL, ts TEXT, spread REAL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS trades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +36,16 @@ CREATE TABLE IF NOT EXISTS trades (
 CREATE TABLE IF NOT EXISTS experiences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     features TEXT, edge REAL, size REAL, brain_score REAL,
-    won INTEGER, pnl REAL, mode TEXT, is_yes INTEGER DEFAULT 1
+    won INTEGER, pnl REAL, mode TEXT, is_yes INTEGER DEFAULT 1,
+    is_counterfactual INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS counterfactuals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    market_id TEXT, is_yes INTEGER, entry_price REAL, entry_ts TEXT,
+    edge REAL, brain_score REAL, features TEXT, source TEXT, reason TEXT,
+    take_profit REAL, stop_loss REAL, max_hold REAL,
+    status TEXT DEFAULT 'pending', exit_price REAL, pnl REAL DEFAULT 0,
+    won INTEGER, exit_reason TEXT, settled_at TEXT, created_at TEXT
 );
 CREATE TABLE IF NOT EXISTS lessons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,6 +92,14 @@ class Store:
             self.conn.execute("ALTER TABLE experiences ADD COLUMN is_yes INTEGER DEFAULT 1")
         except sqlite3.OperationalError:
             pass
+        try:  # experiences may now be counterfactual (veto/mirror) rather than traded
+            self.conn.execute("ALTER TABLE experiences ADD COLUMN is_counterfactual INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:  # snapshots now carry the spread so counterfactuals charge the real cost
+            self.conn.execute("ALTER TABLE snapshots ADD COLUMN spread REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
 
     # --- snapshots (for price-move anomaly detection) ---
     def last_yes_price(self, market_id: str) -> Optional[float]:
@@ -84,12 +109,29 @@ class Store:
         ).fetchone()
         return None if row is None else float(row["yes_price"])
 
-    def record_snapshot(self, market_id: str, yes_price: float) -> None:
+    def record_snapshot(self, market_id: str, yes_price: float, spread: float = 0.0) -> None:
         self.conn.execute(
-            "INSERT INTO snapshots(market_id, yes_price, ts) VALUES (?,?,?)",
-            (market_id, yes_price, datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO snapshots(market_id, yes_price, ts, spread) VALUES (?,?,?,?)",
+            (market_id, yes_price, datetime.now(timezone.utc).isoformat(), float(spread)),
         )
         self.conn.commit()
+
+    def snapshots_between(
+        self, market_id: str, t0: datetime, t1: datetime
+    ) -> list[tuple[datetime, float, float]]:
+        """Price path (ts, yes_price, spread) for a market in (t0, t1], oldest first.
+        The real series counterfactual scalps are replayed against."""
+        rows = self.conn.execute(
+            "SELECT yes_price, ts, spread FROM snapshots WHERE market_id=? AND ts>? AND ts<=? "
+            "ORDER BY ts ASC",
+            (market_id, t0.isoformat(), t1.isoformat()),
+        ).fetchall()
+        out: list[tuple[datetime, float, float]] = []
+        for r in rows:
+            keys = r.keys()
+            spread = float(r["spread"]) if "spread" in keys and r["spread"] is not None else 0.0
+            out.append((datetime.fromisoformat(r["ts"]), float(r["yes_price"]), spread))
+        return out
 
     # --- trades ---
     def save_trade(self, t: Trade) -> int:
@@ -201,11 +243,11 @@ class Store:
     # --- experiences (brain training data; mode-agnostic) ---
     def save_experience(self, e: Experience) -> None:
         self.conn.execute(
-            "INSERT INTO experiences(features, edge, size, brain_score, won, pnl, mode, is_yes)"
-            " VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO experiences(features, edge, size, brain_score, won, pnl, mode, is_yes,"
+            " is_counterfactual) VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 json.dumps(e.features), e.edge, e.size, e.brain_score, int(e.won),
-                e.pnl, e.mode.value, int(e.is_yes),
+                e.pnl, e.mode.value, int(e.is_yes), int(e.is_counterfactual),
             ),
         )
         self.conn.commit()
@@ -215,15 +257,87 @@ class Store:
         out: list[Experience] = []
         for r in rows:
             keys = r.keys()
+            cf = "is_counterfactual" in keys and r["is_counterfactual"]
             out.append(
                 Experience(
                     features=json.loads(r["features"]), edge=r["edge"], size=r["size"],
                     brain_score=r["brain_score"], won=bool(r["won"]), pnl=r["pnl"],
                     mode=Mode(r["mode"]),
                     is_yes=bool(r["is_yes"]) if "is_yes" in keys and r["is_yes"] is not None else True,
+                    is_counterfactual=bool(cf),
                 )
             )
         return out
+
+    # --- counterfactuals (veto/mirror learning data; settled via snapshots) ---
+    def save_counterfactual(self, c: Counterfactual) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO counterfactuals(market_id, is_yes, entry_price, entry_ts, edge,"
+            " brain_score, features, source, reason, take_profit, stop_loss, max_hold,"
+            " status, exit_price, pnl, won, exit_reason, settled_at, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                c.market_id, int(c.is_yes), c.entry_price, c.entry_ts.isoformat(), c.edge,
+                c.brain_score, json.dumps(c.features), c.source, c.reason, c.take_profit,
+                c.stop_loss, c.max_hold, c.status, c.exit_price, c.pnl, _b(c.won),
+                c.exit_reason, c.settled_at.isoformat() if c.settled_at else None,
+                c.created_at.isoformat(),
+            ),
+        )
+        self.conn.commit()
+        c.id = int(cur.lastrowid)
+        return c.id
+
+    def _row_to_counterfactual(self, r: sqlite3.Row) -> Counterfactual:
+        return Counterfactual(
+            id=r["id"], market_id=r["market_id"], is_yes=bool(r["is_yes"]),
+            entry_price=r["entry_price"], entry_ts=datetime.fromisoformat(r["entry_ts"]),
+            edge=r["edge"], brain_score=r["brain_score"],
+            features=json.loads(r["features"]) if r["features"] else [],
+            source=r["source"] or "veto", reason=r["reason"] or "",
+            take_profit=r["take_profit"], stop_loss=r["stop_loss"], max_hold=r["max_hold"],
+            status=r["status"] or "pending", exit_price=r["exit_price"], pnl=r["pnl"] or 0.0,
+            won=None if r["won"] is None else bool(r["won"]), exit_reason=r["exit_reason"] or "",
+            settled_at=datetime.fromisoformat(r["settled_at"]) if r["settled_at"] else None,
+            created_at=datetime.fromisoformat(r["created_at"]) if r["created_at"] else datetime.now(timezone.utc),
+        )
+
+    def pending_counterfactuals(self) -> list[Counterfactual]:
+        rows = self.conn.execute(
+            "SELECT * FROM counterfactuals WHERE status='pending' ORDER BY id ASC"
+        ).fetchall()
+        return [self._row_to_counterfactual(r) for r in rows]
+
+    def update_counterfactual(self, c: Counterfactual) -> None:
+        self.conn.execute(
+            "UPDATE counterfactuals SET status=?, exit_price=?, pnl=?, won=?, exit_reason=?,"
+            " settled_at=? WHERE id=?",
+            (
+                c.status, c.exit_price, c.pnl, _b(c.won), c.exit_reason,
+                c.settled_at.isoformat() if c.settled_at else None, c.id,
+            ),
+        )
+        self.conn.commit()
+
+    def counterfactual_stats(self) -> dict:
+        """Counts for the dashboard veto-scoreboard.
+
+        brain_right = vetoed setups (source='veto') that would have LOST (the veto
+        saved us); brain_wrong = vetoed setups that would have WON (too strict)."""
+        row = self.conn.execute(
+            "SELECT "
+            " SUM(status='pending') AS pending,"
+            " SUM(status='settled') AS settled,"
+            " SUM(status='settled' AND source='veto' AND won=0) AS veto_right,"
+            " SUM(status='settled' AND source='veto' AND won=1) AS veto_wrong"
+            " FROM counterfactuals"
+        ).fetchone()
+        return {
+            "pending": int(row["pending"] or 0),
+            "settled": int(row["settled"] or 0),
+            "brain_right": int(row["veto_right"] or 0),
+            "brain_wrong": int(row["veto_wrong"] or 0),
+        }
 
     # --- manager decisions (BrainManager audit trail) ---
     def save_manager_decision(self, d: ManagerDecision) -> None:

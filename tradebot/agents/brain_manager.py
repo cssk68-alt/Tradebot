@@ -37,11 +37,15 @@ class BrainManager(Agent):
     def __init__(self, settings, store, log, client=None):
         super().__init__(settings, store, log)
         self.client = client
+        # Per-run verdicts (signal, approved, reason) so the orchestrator can record
+        # counterfactuals for the vetoed ones with their veto reason.
+        self.decisions: list[tuple[Signal, bool, str]] = []
 
     def run(
         self, signals: list[Signal], reports: dict[str, ResearchReport]
     ) -> list[Signal]:
         approved: list[Signal] = []
+        self.decisions = []
         # The operator's Risk-Adjuster 'Ping': one instruction line that tells the
         # agent how bold to be this cycle (empty when the knob is conservative).
         profile = risk_profile(self.settings)
@@ -50,6 +54,7 @@ class BrainManager(Agent):
         for sig in signals:
             report = reports.get(sig.market_id)
             verdict = self._decide(sig, report, profile.appetite_prompt)
+            self.decisions.append((sig, verdict.approved, verdict.reason))
             self.store.save_manager_decision(
                 ManagerDecision(
                     market_id=sig.market_id, question=sig.question,

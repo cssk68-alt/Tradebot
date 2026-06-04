@@ -24,7 +24,7 @@ class ScanAgent(Agent):
         for m in markets:
             days = m.days_to_resolution()
             last = self.store.last_yes_price(m.id)
-            self.store.record_snapshot(m.id, m.yes_price)
+            self.store.record_snapshot(m.id, m.yes_price, m.spread)
             price_move = abs(m.yes_price - last) if last is not None else 0.0
 
             if not passes_spread_filter(m, max_spread, s.min_liquidity):

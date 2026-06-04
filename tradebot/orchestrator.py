@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 from tradebot.agents.brain_manager import BrainManager
@@ -11,6 +11,7 @@ from tradebot.agents.predict import PredictAgent
 from tradebot.agents.research import ResearchAgent
 from tradebot.agents.risk import RiskAgent
 from tradebot.agents.scan import ScanAgent
+from tradebot.brain.counterfactual import settle_scalp_path
 from tradebot.brain.feedback import Brain
 from tradebot.brain.hold_analysis import recommend_max_hold, scalp_hold_seconds
 from tradebot.data.gamma import DataUnavailableError, GammaClient
@@ -19,7 +20,7 @@ from tradebot.exchange.polymarket import PolymarketExchange
 from tradebot.llm import LLMUnavailableError, make_client
 from tradebot.ml.bootstrap import predictor_training_data
 from tradebot.ml.model import Predictor
-from tradebot.models import Experience, Mode
+from tradebot.models import Counterfactual, Experience, Mode
 from tradebot.risk.circuit_breaker import circuit_breaker_reason
 from tradebot.store.db import Store
 
@@ -44,7 +45,7 @@ class Orchestrator:
 
         self.store = Store(settings.db_path)
         self.gamma = GammaClient(log)
-        self.brain = Brain(settings.brain_path, log)
+        self.brain = Brain(settings.brain_path, log, l2=float(getattr(settings, "brain_l2", 0.0)))
         self.predictor = Predictor(log)
         self.mode = Mode.LIVE if settings.mode == "live" else Mode.PAPER
 
@@ -91,6 +92,100 @@ class Orchestrator:
         """Brain's empirical max-hold recommendation (Teil A.2) — advice only."""
         won, lost = scalp_hold_seconds(self.store.resolved_trades(), self.mode)
         return recommend_max_hold(won, lost, getattr(self.settings, "max_hold_seconds", 300.0))
+
+    # --- counterfactual (veto/mirror) learning ---
+    def _record_counterfactuals(self, signals, placed) -> None:
+        """Record what the trades we did NOT make would have done (Problem 1).
+
+        For every signal this cycle: if it was NOT executed (vetoed / sized-out) we
+        probe its OWN side; for every signal we also probe the MIRROR (opposite)
+        side. Settled later against the real snapshot price path. Scalp-only — the
+        counterfactual replay uses the scalp exit logic."""
+        if not signals or getattr(self.settings, "strategy", "scalp") != "scalp":
+            return
+        placed_ids = {t.market_id for t in placed}
+        veto_reason = {
+            sig.market_id: reason
+            for sig, ok, reason in getattr(self.manager, "decisions", [])
+            if not ok
+        }
+        now = datetime.now(timezone.utc)
+        for sig in signals:
+            traded = sig.market_id in placed_ids
+            if not traded:
+                self._save_cf(
+                    sig, sig.is_yes, sig.market_price, sig.edge, "veto",
+                    veto_reason.get(sig.market_id, "not executed"), now,
+                )
+            self._save_cf(
+                sig, not sig.is_yes, 1.0 - sig.market_price, -sig.edge, "mirror",
+                "mirror of executed trade" if traded else "mirror of vetoed signal", now,
+            )
+
+    def _save_cf(self, sig, is_yes, entry_price, edge, source, reason, now) -> None:
+        self.store.save_counterfactual(
+            Counterfactual(
+                market_id=sig.market_id, is_yes=is_yes, entry_price=entry_price,
+                entry_ts=now, edge=edge, brain_score=sig.brain_score,
+                features=list(sig.features), source=source, reason=reason,
+                take_profit=self.settings.take_profit, stop_loss=self.settings.stop_loss,
+                max_hold=getattr(self.settings, "max_hold_seconds", 300.0),
+            )
+        )
+
+    def settle_counterfactuals(self) -> int:
+        """Replay pending counterfactuals over the real snapshot price path; settled
+        ones become flagged training experiences (if learn_from_vetos). Returns the
+        number of NEW training experiences added (0 if none -> no retrain)."""
+        pending = self.store.pending_counterfactuals()
+        if not pending:
+            return 0
+        now = datetime.now(timezone.utc)
+        learn = bool(getattr(self.settings, "learn_from_vetos", True))
+        spread_floor = getattr(self.settings, "min_spread_cost", 0.01)
+        added = 0
+        for cf in pending:
+            series = self.store.snapshots_between(cf.market_id, cf.entry_ts, now)
+            res = settle_scalp_path(
+                cf.entry_price, cf.is_yes, series, cf.entry_ts, cf.take_profit,
+                cf.stop_loss, cf.max_hold, now, spread_floor=spread_floor,
+            )
+            if res["status"] == "pending":
+                continue
+            cf.status = res["status"]  # "settled" | "expired"
+            cf.settled_at = now
+            if res["status"] == "settled":
+                cf.exit_price = res["exit_price"]
+                cf.pnl = res["pnl"]
+                cf.won = res["won"]
+                cf.exit_reason = res["exit_reason"]
+                self.store.update_counterfactual(cf)
+                if learn:
+                    self.store.save_experience(
+                        Experience(
+                            features=cf.features, edge=cf.edge, size=1.0,
+                            brain_score=cf.brain_score, won=bool(cf.won), pnl=cf.pnl,
+                            mode=self.mode, is_yes=cf.is_yes, is_counterfactual=True,
+                        )
+                    )
+                    added += 1
+            else:
+                self.store.update_counterfactual(cf)
+        if added:
+            self._train_models()
+            self.log.info("Counterfactuals: %d settled -> brain retrained", added)
+        return added
+
+    def brain_diagnostics(self) -> dict:
+        """Out-of-sample metrics + feature importance + veto scoreboard (Problem 2)."""
+        exps = self.store.load_experiences()
+        diag = self.brain.diagnostics(exps)
+        diag["counterfactuals"] = self.store.counterfactual_stats()
+        real = sum(1 for e in exps if not e.is_counterfactual)
+        diag["experiences"] = {
+            "real": real, "counterfactual": len(exps) - real, "total": len(exps),
+        }
+        return diag
 
     def _record_resolved(self, r) -> None:
         self.store.update_trade(r)
@@ -182,6 +277,9 @@ class Orchestrator:
             self.log.error("HARD-FAIL: aborting cycle — %s", e)
             raise
         self.manage_open(markets)
+        # Settle any counterfactuals whose scalp window has elapsed (Problem 1):
+        # learns from vetoed/mirror setups via the real snapshot price path.
+        self.settle_counterfactuals()
         # Circuit breaker (Teil B.2): check AFTER managing open trades (so today's
         # realized PnL / streak are fresh) and BEFORE opening anything new. When it
         # trips we open NOTHING this cycle; open positions are untouched (no abandon)
@@ -204,6 +302,9 @@ class Orchestrator:
         liq = {c.market.id: c.market.liquidity for c in candidates}
         spreads = {c.market.id: c.market.spread for c in candidates}
         placed = self.risk.run(approved, self.bankroll(), liq, spreads)
+        # Record counterfactuals for what we did NOT trade (vetoed/sized-out) and the
+        # mirror of what we did — settled next cycles via the snapshot price path.
+        self._record_counterfactuals(signals, placed)
         self.log.info(
             "=== Cycle done: %d candidates, %d signals, %d approved, %d trades placed ===",
             len(candidates), len(signals), len(approved), len(placed),

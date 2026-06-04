@@ -34,6 +34,10 @@ def test_state_has_new_fields(tmp_path):
 
     assert "hold_recommendation" in state and state["hold_recommendation"]["status"] in ("ok", "insufficient")
     assert "circuit_breaker" in state and "tripped" in state["circuit_breaker"]
+    # brain diagnostics block (Problem 2) present with its sub-keys
+    bd = state["brain_diagnostics"]
+    assert "oos" in bd and "feature_importance" in bd and "counterfactuals" in bd
+    assert "experiences" in bd and bd["experiences"]["total"] >= 0
     # exec_style is surfaced per trade
     assert all("exec_style" in t for t in state["resolved_trades"])
     assert any(t["exec_style"] == "maker" for t in state["resolved_trades"])

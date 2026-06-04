@@ -5,24 +5,23 @@ from __future__ import annotations
 
 from tradebot.brain.experience import to_xy
 from tradebot.brain.network import make_brain
-from tradebot.ml.features import BRAIN_FEATURE_DIM
+from tradebot.ml.features import BRAIN_FEATURE_DIM, BRAIN_FEATURE_NAMES
 from tradebot.models import Experience
 
 
 class Brain:
-    def __init__(self, path, log, input_dim: int = BRAIN_FEATURE_DIM):
+    def __init__(self, path, log, input_dim: int = BRAIN_FEATURE_DIM, l2: float = 0.0):
         self.path = str(path)
         self.log = log
+        self.l2 = float(l2)  # L2 weight-decay used for training + OOS validation
         self.net = make_brain(input_dim)
         if self.net.load(self.path):
             self.log.info("Brain: loaded existing weights from %s", self.path)
 
-    def train_from_experiences(self, experiences: list[Experience]) -> bool:
+    def _compatible_xy(self, experiences: list[Experience]):
+        """Drop rows from an older (narrower) feature schema so growing the feature
+        set never crashes training; returns (X, y) the current net can consume."""
         X, y = to_xy(experiences)
-        # Guard against feature-schema drift: experiences saved under an older,
-        # narrower feature set produce shorter rows than the current net expects.
-        # Drop the incompatible rows instead of crashing, so growing the feature
-        # set never breaks a running cycle (old rows simply stop contributing).
         dim = self.net.input_dim
         compat = [(xi, yi) for xi, yi in zip(X, y) if len(xi) == dim]
         if len(compat) < len(X):
@@ -31,9 +30,11 @@ class Brain:
                 "(net expects %d-dim); %d compatible remain.",
                 len(X) - len(compat), dim, len(compat),
             )
-        X = [xi for xi, _ in compat]
-        y = [yi for _, yi in compat]
-        if self.net.train(X, y):
+        return [xi for xi, _ in compat], [yi for _, yi in compat]
+
+    def train_from_experiences(self, experiences: list[Experience]) -> bool:
+        X, y = self._compatible_xy(experiences)
+        if self.net.train(X, y, l2=self.l2):
             self.net.save(self.path)
             wins = sum(y)
             self.log.info(
@@ -42,6 +43,14 @@ class Brain:
             )
             return True
         return False
+
+    def diagnostics(self, experiences: list[Experience]) -> dict:
+        """Out-of-sample metrics + feature importance (REPORTING only; the
+        production net above still trains on all data)."""
+        from tradebot.brain.validation import diagnose
+
+        X, y = self._compatible_xy(experiences)
+        return diagnose(make_brain, self.net.input_dim, X, y, BRAIN_FEATURE_NAMES, l2=self.l2)
 
     def score(self, features: list[float]) -> float:
         """P(this setup wins) in [0, 1]; 0.5 when untrained (cold start)."""

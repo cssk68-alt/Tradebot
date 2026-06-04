@@ -323,6 +323,17 @@ def test_manager_passes_forecast_context(tmp_path):
     assert cap.kw["forecast_context"] == "main driver: poll lead; risk: low turnout"
 
 
+def test_manager_exposes_decisions_for_counterfactuals(tmp_path):
+    # The orchestrator reads BrainManager.decisions to record veto counterfactuals,
+    # so each run must expose (signal, approved, reason) per judged signal.
+    s = _settings(tmp_path)
+    mgr = BrainManager(s, Store(s.db_path), log, _ClaudeVeto())
+    mgr.run([_signal()], {"m": ResearchReport(market_id="m")})
+    assert len(mgr.decisions) == 1
+    sig, approved, reason = mgr.decisions[0]
+    assert approved is False and reason
+
+
 def test_manager_fails_closed_on_unparseable_llm(tmp_path):
     s = _settings(tmp_path)
     store = Store(s.db_path)

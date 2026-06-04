@@ -2,6 +2,60 @@
 
 Stand: 2026-06-04 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
+## Brain-Learning: Counterfactuals (Veto/Mirror), Validierung & Feature-Importance (neu, 2026-06-04)
+
+Antwort auf drei Probleme: **Survivorship Bias** (Brain lernt nur aus selbst gemachten Trades),
+**keine Validierung** (keine Feature-Importance, kein Out-of-Sample, keine bewusste Gewichtung),
+**zu wenig Daten**. Alle Logik in reinen, getesteten Modulen.
+
+### Problem 1 — Counterfactual-Learning (Veto + Mirror)
+- **Mechanismus (vom Nutzer geklärt):** NICHT „halten bis Auflösung". Stattdessen: was hätte der
+  Trade — oder die Gegenseite — **in unserem Scalp-Stil über dasselbe kurze Fenster** gebracht?
+  Abgewickelt über die reale Preis-Bahn aus `snapshots` (jetzt mit `spread`-Spalte) mit der
+  EXISTIERENDEN Scalp-Logik (TP/SL/max_hold). Kein simuliertes Outcome — nur die Position ist
+  hypothetisch, die Preise sind echt.
+- **`brain/counterfactual.py::settle_scalp_path`** (rein): replayed einen Scalp über
+  `[(ts, yes_price, spread)]` → `settled|pending|expired` + exit_price/pnl/won/reason.
+- **Capture (Orchestrator `_record_counterfactuals`):** pro Signal → vetot/sized-out: eigene Seite
+  (Source `veto`, mit Reason) + Gegenseite (`mirror`); real getradet: nur Gegenseite. `BrainManager`
+  legt dazu `self.decisions` (Signal, approved, reason) ab. Nur im Scalp-Modus.
+- **Settle (`settle_counterfactuals`, in `run_once` nach `manage_open`):** pending CF gegen
+  `snapshots_between` abwickeln; bei `settled` → geflaggte `Experience(is_counterfactual=True)` →
+  Brain retrainiert. `learn_from_vetos`-Setting (Default an) steuert das Training; das Scoreboard
+  füllt sich unabhängig.
+- **Neu:** Tabelle `counterfactuals` + Model `Counterfactual`; `Experience.is_counterfactual`;
+  `snapshots.spread`; Store-CRUD (`save/pending/update_counterfactual`, `counterfactual_stats`,
+  `snapshots_between`). Counterfactuals speisen NUR das Brain (Scalp-PnL-Label), NICHT den
+  resolution-basierten XGBoost-Predictor.
+
+### Problem 2 — Validierung
+- **`brain/validation.py`** (rein): `time_split` (chronologisch, kein Lookahead),
+  `evaluate_oos` (frisches Netz auf Train, Messung Accuracy/LogLoss/AUC auf ungesehenem Test),
+  `permutation_importance` (Feature mischen → LogLoss-Verschlechterung = Wichtigkeit), `diagnose`
+  (beides aus EINEM Held-out-Fit, kein Leak). Produktiv-Brain trainiert weiter auf ALLEN Daten;
+  diese Splits sind nur Reporting.
+- **L2-Regularisierung** in beiden Brain-Backends (`brain_l2`, Default 1e-4) → Rausch-Features
+  werden Richtung 0 gedrückt (das Netz „lernt selbst, welche Features zählen"). Verifiziert:
+  synthetisches Signal-Feature bekam Importance ~+4.3, Rauschen ~0; OOS-Accuracy/AUC = 1.0.
+
+### Problem 3 — Mehr Daten
+- Counterfactuals liefern **1–2 echte Labels pro Signal pro Zyklus** (Veto + Mirror) statt ~0–1
+  Trade. ≥8-Trainingsschwelle wird schneller und mit ausgewogeneren Klassen erreicht; die Schwelle
+  wurde NICHT gesenkt (Overfitting-Schutz).
+
+### Surfacing
+- `state.json` → `brain_diagnostics` { oos, feature_importance, counterfactuals (Veto-Scoreboard:
+  richtig/zu-streng/offen), experiences (real vs counterfactual) }. Dashboard-Panel „Brain-Diagnose"
+  (`index.html`/`app.js`). CLI: `reset` wiped auch `counterfactuals`; neuer Befehl `brain-report`.
+  Settings (config-only): `learn_from_vetos`, `brain_l2`.
+
+### Tests
+- **153 grün** (vorher 130, +23). Neu: `test_counterfactual.py`, `test_validation.py`,
+  `test_store_counterfactual.py`, `test_counterfactual_orchestrator.py`; Ergänzungen in
+  `test_hardfail_and_settlement.py` (BrainManager.decisions) und `test_dashboard_state.py`.
+- Brain + Dashboard erneut gecleart (Schema-Erweiterung), `state.json` neu (leer, mit
+  `brain_diagnostics`).
+
 ## Microstructure-Verbesserungen: Tick / Spread / Circuit-Breaker / Maker-First / Hold-Analyse (neu, 2026-06-04)
 
 Umsetzung der `IMPLEMENTIERUNGSVORGABEN` — 5 Punkte umgesetzt, 2 bewusst ausgelassen.

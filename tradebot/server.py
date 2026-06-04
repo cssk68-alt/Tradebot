@@ -30,6 +30,8 @@ DEFAULTS: dict = {
     "confidence_threshold": 0.6,
     "brain_weight": 0.3,
     "brain_veto_threshold": 0.35,
+    "learn_from_vetos": True,  # brain learns from vetoed/mirror counterfactuals
+    "brain_l2": 1e-4,          # L2 weight-decay for the brain (feature weighting)
     "aggressiveness": 0.0,  # Risk-Adjuster knob (Seite 2), 0..1
     "max_slippage": 0.02,
     "min_days_to_resolution": 1.0,

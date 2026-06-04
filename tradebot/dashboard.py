@@ -70,6 +70,15 @@ def build_state(store, settings, brain) -> dict:
     streak = store.consecutive_losses(mode)
     cb_reason = circuit_breaker_reason(realized_today, start + store.realized_pnl(mode), streak, settings)
 
+    # Brain diagnostics (Problem 2): out-of-sample metrics + feature importance +
+    # veto scoreboard + real-vs-counterfactual experience split.
+    brain_diag = brain.diagnostics(experiences)
+    brain_diag["counterfactuals"] = store.counterfactual_stats()
+    real_exp = sum(1 for e in experiences if not getattr(e, "is_counterfactual", False))
+    brain_diag["experiences"] = {
+        "real": real_exp, "counterfactual": len(experiences) - real_exp, "total": len(experiences),
+    }
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode.value,
@@ -95,6 +104,7 @@ def build_state(store, settings, brain) -> dict:
             for l in store.recent_lessons(12)
         ],
         "hold_recommendation": hold_rec,
+        "brain_diagnostics": brain_diag,
         "circuit_breaker": {
             "tripped": bool(cb_reason),
             "reason": cb_reason or "",

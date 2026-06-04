@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.6
     brain_weight: float = 0.3
     brain_veto_threshold: float = 0.35
+    # Brain learning (counterfactuals + regularization). learn_from_vetos feeds the
+    # brain what vetoed/mirror setups WOULD have done over our scalp window (real
+    # snapshot prices). brain_l2 is the L2 weight-decay so the net down-weights
+    # noise features and generalizes (out-of-sample).
+    learn_from_vetos: bool = True
+    brain_l2: float = 1e-4
 
     # Circuit breaker (Teil B.2): stop opening NEW trades when the day's realized
     # loss or a losing streak hits its limit. Open positions are never abandoned —

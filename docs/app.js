@@ -39,6 +39,7 @@ function render(s) {
   $("equityChart").innerHTML = equitySvg(s.equity_curve, s.starting_bankroll);
   $("brainPanel").innerHTML = brainPanel(s);
   if ($("diagnostics")) $("diagnostics").innerHTML = diagnosticsHtml(s);
+  if ($("brainDiag")) $("brainDiag").innerHTML = brainDiagHtml(s);
   $("resolvedTable").innerHTML = tradesTable(s.resolved_trades, true);
   $("openTable").innerHTML = tradesTable(s.open_trades, false);
   $("lessons").innerHTML = lessonsHtml(s.lessons);
@@ -113,6 +114,35 @@ function diagnosticsHtml(s) {
     `${cb.consecutive_losses || 0} Verluste in Folge</div></div>`;
 
   return hold + breaker;
+}
+
+function brainDiagHtml(s) {
+  const d = s.brain_diagnostics || {};
+  const oos = d.oos || {};
+  const cf = d.counterfactuals || {};
+  const ex = d.experiences || {};
+  const imp = d.feature_importance || [];
+  const oosBlock = oos.status === "ok"
+    ? `Accuracy ${pct(oos.accuracy)} · LogLoss ${fmt(oos.logloss, 3)} · AUC ${fmt(oos.auc, 3)} ` +
+      `<span class="muted">(Train ${oos.n_train} / Test ${oos.n_test})</span>`
+    : `<span class="muted">zu wenig Daten (Train ${oos.n_train || 0} / Test ${oos.n_test || 0})</span>`;
+  const impBlock = imp.length
+    ? `<ul class="lessons">` + imp.map((f) =>
+        `<li><b>${esc(f.name)}</b> <span class="${f.importance >= 0 ? "pos" : "neg"}">` +
+        `${f.importance >= 0 ? "+" : ""}${fmt(f.importance, 3)}</span></li>`).join("") + `</ul>`
+    : `<div class="muted">noch keine Feature-Importance (zu wenig Daten)</div>`;
+  const row = (label, body) =>
+    `<div style="padding:8px 0;border-bottom:1px solid #eef2f7"><b>${label}</b>` +
+    `<div style="margin-top:4px">${body}</div></div>`;
+  return (
+    row("Out-of-Sample (auf ungesehenen Trades)", oosBlock) +
+    row("Lerndaten", `<span class="muted">${ex.total || 0} gesamt · ${ex.real || 0} echt · ` +
+      `${ex.counterfactual || 0} counterfactual (Veto/Mirror)</span>`) +
+    row("Veto-Scoreboard", `${cf.brain_right || 0} Vetos richtig (hätten verloren) · ` +
+      `<span class="neg">${cf.brain_wrong || 0} zu streng</span> (hätten gewonnen) · ` +
+      `<span class="muted">${cf.pending || 0} offen</span>`) +
+    `<div style="padding:8px 0"><b>Wichtigste Features</b><div style="margin-top:4px">${impBlock}</div></div>`
+  );
 }
 
 function tradesTable(rows, resolved) {
