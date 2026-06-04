@@ -54,19 +54,37 @@ async function load() {
 }
 
 function render(s) {
+  // Schutz: state.json ist leer oder noch nicht geschrieben (z.B. nach Reset)
+  if (!s || !s.mode) {
+    const msg =
+      `<div class="empty" style="padding:24px 0">
+        ⏳ <strong>Noch keine Daten.</strong><br/>
+        Starte den Bot: <code>Start.bat</code> öffnen, dann oben auf <b>▶ Start</b> klicken.<br/>
+        <span style="font-size:12px;color:var(--muted)">
+          Das Dashboard füllt sich nach dem ersten abgeschlossenen Zyklus automatisch.
+        </span>
+      </div>`;
+    $("kpis").innerHTML = msg;
+    ["equityChart","brainPanel","diagnostics","brainDiag","resolvedTable","openTable","lessons"]
+      .forEach(id => { const el = $(id); if (el) el.innerHTML = '<div class="empty">—</div>'; });
+    return;
+  }
+
   const badge = $("modeBadge");
   badge.textContent = (s.mode || "").toUpperCase();
   badge.className = "badge " + (s.mode === "live" ? "live" : "paper");
   $("generatedAt").textContent = s.generated_at ? new Date(s.generated_at).toLocaleString() : "—";
 
-  const pnlClass = s.realized_pnl >= 0 ? "pos" : "neg";
+  const brain  = s.brain  || {};
+  const config = s.config || {};
+  const pnlClass = (s.realized_pnl || 0) >= 0 ? "pos" : "neg";
   $("kpis").innerHTML = [
     kpi("Bankroll", "$" + fmt(s.bankroll), `start $${fmt(s.starting_bankroll)}`),
-    kpi("Realized PnL", (s.realized_pnl >= 0 ? "+" : "") + "$" + fmt(s.realized_pnl), "", pnlClass),
-    kpi("Win rate", pct(s.win_rate), `${s.n_wins}W / ${s.n_losses}L`),
-    kpi("Trades", s.n_trades, `${s.n_open} open`),
-    kpi("Brain", s.brain.trained ? "Trained" : "Cold start", `${s.brain.experiences} experiences`,
-      s.brain.trained ? "pos" : ""),
+    kpi("Realized PnL", ((s.realized_pnl || 0) >= 0 ? "+" : "") + "$" + fmt(s.realized_pnl), "", pnlClass),
+    kpi("Win rate", pct(s.win_rate), `${s.n_wins || 0}W / ${s.n_losses || 0}L`),
+    kpi("Trades", s.n_trades || 0, `${s.n_open || 0} open`),
+    kpi("Brain", brain.trained ? "Trained" : "Cold start", `${brain.experiences || 0} experiences`,
+      brain.trained ? "pos" : ""),
   ].join("");
 
   $("equityChart").innerHTML = equitySvg(s.equity_curve, s.starting_bankroll);
@@ -74,7 +92,7 @@ function render(s) {
   if ($("diagnostics")) $("diagnostics").innerHTML = diagnosticsHtml(s);
   if ($("brainDiag")) $("brainDiag").innerHTML = brainDiagHtml(s);
   $("resolvedTable").innerHTML = tradesTable(s.resolved_trades, true);
-  const maxHold = (s.config || {}).max_hold_seconds || 300;
+  const maxHold = config.max_hold_seconds || 300;
   $("openTable").innerHTML = stuckWarning(s.open_trades, maxHold) + tradesTable(s.open_trades, false);
   $("lessons").innerHTML = lessonsHtml(s.lessons);
 }
@@ -110,15 +128,16 @@ function equitySvg(points, start) {
 }
 
 function brainPanel(s) {
-  const b = s.brain, total = b.experiences || 0;
-  const wp = total ? Math.round((100 * b.wins) / total) : 0;
+  const b = s.brain || {}, cfg = s.config || {};
+  const total = b.experiences || 0;
+  const wp = total ? Math.round((100 * (b.wins || 0)) / total) : 0;
   return (
     `<div class="brain-state ${b.trained ? "on" : "off"}">` +
     (b.trained ? "● Active — learning from outcomes" : "○ Cold start — needs ≥8 resolved trades") +
     `</div>` +
     `<div class="bar"><div class="bar-win" style="width:${wp}%"></div></div>` +
-    `<div class="brain-legend"><span>${b.wins} wins</span><span>${b.losses} losses</span></div>` +
-    `<p class="muted">The brain scores every setup; below <b>${esc(s.config.brain_veto_threshold)}</b> ` +
+    `<div class="brain-legend"><span>${b.wins || 0} wins</span><span>${b.losses || 0} losses</span></div>` +
+    `<p class="muted">The brain scores every setup; below <b>${esc(cfg.brain_veto_threshold ?? "—")}</b> ` +
     `it vetoes the trade. Learned weights carry over from paper to live.</p>`
   );
 }

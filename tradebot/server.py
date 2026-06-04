@@ -193,7 +193,7 @@ class _Runner:
                 # down the open ones gracefully (no abandon).
                 if orch.breaker_reason:
                     self.stop_reason = f"Circuit-Breaker: {orch.breaker_reason}"
-                    self.log.warning("Stopping run — %s", self.stop_reason)
+                    log.warning("Stopping run — %s", self.stop_reason)
                     break
                 self._stop.wait(self.interval)
             # Stop / cap reached: don't abandon live positions — wind down (open
