@@ -44,6 +44,22 @@ def test_expired_when_no_price_data():
     assert r["status"] == "expired"
 
 
+def test_expired_on_data_gap_never_guesses():
+    # Window elapsed, but the ONLY tick is before max_hold (the market stopped being
+    # scanned). We never observed the window's end -> do NOT invent an outcome.
+    r = settle_scalp_path(0.50, True, [(_ts(60), 0.505, 0.005)], BASE,
+                          take_profit=0.05, stop_loss=0.05, max_hold=300, now=_ts(5000))
+    assert r["status"] == "expired"
+
+
+def test_stale_post_window_tick_is_ignored():
+    # The first tick after a gap is far past the window (held 5000s >> 2*max_hold):
+    # settling there would use a price unrelated to the 5-min scalp -> expire instead.
+    r = settle_scalp_path(0.50, True, [(_ts(5000), 0.90, 0.005)], BASE,
+                          take_profit=0.02, stop_loss=0.03, max_hold=300, now=_ts(6000))
+    assert r["status"] == "expired"
+
+
 def test_mirror_no_side_uses_complement_price():
     # NO entry at 0.50; YES drops 0.50->0.45 => NO price 0.50->0.55 (+0.05 >= TP) -> win.
     r = settle_scalp_path(0.50, False, [(_ts(60), 0.45, 0.005)], BASE,

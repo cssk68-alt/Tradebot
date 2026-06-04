@@ -16,6 +16,12 @@ Antwort auf drei Probleme: **Survivorship Bias** (Brain lernt nur aus selbst gem
   hypothetisch, die Preise sind echt.
 - **`brain/counterfactual.py::settle_scalp_path`** (rein): replayed einen Scalp über
   `[(ts, yes_price, spread)]` → `settled|pending|expired` + exit_price/pnl/won/reason.
+- **NUR ECHTE WERTE — nie geraten.** Ein Counterfactual wird ausschließlich abgewickelt auf
+  (a) einer realen TP/SL-Überschreitung im Fenster oder (b) dem ersten realen Snapshot bei/nach
+  `max_hold` und höchstens `2×max_hold` (rechtzeitiger Time-Exit). Bei Datenlücke (Markt nicht mehr
+  gescannt) oder zu spätem Tick wird NICHTS erfunden → `pending` (Fenster offen) bzw. `expired`
+  (Ausgang unbekannt, kein Lernen). Der synthetische `backtest` ist vollständig isoliert (eigener
+  Predictor/Bankroll, kein Zugriff auf Store/Brain) und kann das Brain nie verschmutzen.
 - **Capture (Orchestrator `_record_counterfactuals`):** pro Signal → vetot/sized-out: eigene Seite
   (Source `veto`, mit Reason) + Gegenseite (`mirror`); real getradet: nur Gegenseite. `BrainManager`
   legt dazu `self.decisions` (Signal, approved, reason) ab. Nur im Scalp-Modus.

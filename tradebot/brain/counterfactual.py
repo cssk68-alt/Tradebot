@@ -13,7 +13,6 @@ real, and the holding window is our short scalp window (NOT hold-to-resolution).
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
 
 
 def _utc(dt: datetime) -> datetime:
@@ -31,15 +30,25 @@ def settle_scalp_path(
     now: datetime,
     spread_floor: float = 0.01,
     size: float = 1.0,
+    max_settle_factor: float = 2.0,
 ) -> dict:
     """Replay one scalp over ``series`` ([(ts, yes_price, spread)] oldest-first).
 
-    Returns a dict with ``status`` in {"pending","settled","expired"}; when settled
-    also ``exit_price``, ``pnl``, ``won`` and ``exit_reason`` ("take_profit" |
-    "stop_loss" | "time"). ``pending`` while the window has not elapsed and no
-    trigger fired; ``expired`` if the window elapsed but no price data exists."""
+    REAL VALUES ONLY — every settled outcome comes from a real observed price at a
+    real observed time; nothing is interpolated or invented. We settle exclusively
+    on (a) a real take-profit / stop-loss crossing within the hold window, or
+    (b) the first real snapshot at/after ``max_hold`` AND no later than
+    ``max_hold * max_settle_factor`` (a timely "time" exit). If the price path has
+    a gap so we never observe the window's end — or the first post-window tick is
+    too late to represent this short scalp — we do NOT guess an outcome: the
+    counterfactual stays ``pending`` (window still open) or becomes ``expired``
+    (unknown, not learned from).
+
+    Returns ``status`` in {"pending","settled","expired"}; when settled also
+    ``exit_price``, ``pnl``, ``won`` and ``exit_reason``."""
     entry_ts = _utc(entry_ts)
     now = _utc(now)
+    cutoff = max_hold * max_settle_factor  # ignore ticks observed far past the window
 
     def _settled(cur: float, spread: float, reason: str) -> dict:
         cost = max(spread, spread_floor)
@@ -49,13 +58,14 @@ def settle_scalp_path(
             "won": pnl > 0, "exit_reason": reason,
         }
 
-    last: Optional[tuple[float, float]] = None  # (side_price, spread) of last seen tick
     for ts, yes_price, spread in series:
         ts = _utc(ts)
         if ts <= entry_ts:
             continue
-        cur = yes_price if is_yes else 1.0 - yes_price
         held = (ts - entry_ts).total_seconds()
+        if held > cutoff:
+            break  # stale tick (gap then reappear) — not a real exit for this window
+        cur = yes_price if is_yes else 1.0 - yes_price
         move = cur - entry_price
         if move >= take_profit:
             return _settled(cur, spread, "take_profit")
@@ -63,14 +73,8 @@ def settle_scalp_path(
             return _settled(cur, spread, "stop_loss")
         if held >= max_hold:
             return _settled(cur, spread, "time")
-        last = (cur, spread)
 
-    # No trigger fired across the available series.
-    window_elapsed = (now - entry_ts).total_seconds() >= max_hold
-    if not window_elapsed:
-        return {"status": "pending"}
-    # Window is over but the market stopped being scanned before max_hold — settle
-    # at the last real price we did see (best available "time" exit), else expire.
-    if last is not None:
-        return _settled(last[0], last[1], "time")
-    return {"status": "expired"}
+    # No real qualifying exit was observed.
+    if (now - entry_ts).total_seconds() < max_hold:
+        return {"status": "pending"}  # window still open — wait for more real ticks
+    return {"status": "expired"}      # window over but outcome never observed — don't guess
