@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from tradebot.models import Signal
 from tradebot.risk.adjuster import risk_profile
+from tradebot.risk.liquidity import depth_too_thin, max_order_for_depth
 
 
 @dataclass
@@ -43,12 +44,18 @@ def size_position(
     if signal.brain_score < profile.brain_veto_threshold:
         return SizeDecision(0.0, 0.0, False, f"brain veto (score {signal.brain_score:.2f})")
 
+    # Order-book DEPTH vs planned order size (Teil A.1): never plan an order larger
+    # than a small fraction of the visible liquidity, and reject outright when the
+    # book is too thin to place even a $1 order.
+    if depth_too_thin(liquidity):
+        return SizeDecision(0.0, 0.0, False, "order-book depth too thin for any order")
+
     # Bolder => more, SMALLER trades: shrink the stake as aggressiveness rises so
     # approval-rate can climb without the dollar risk per marginal trade climbing.
     frac = min(settings.kelly_fraction * f_star, settings.max_trade_pct) * profile.size_factor
     amount = frac * bankroll
     budget = max(0.0, settings.max_exposure_pct * bankroll - current_exposure)
-    amount = min(amount, budget, 0.1 * max(0.0, liquidity))
+    amount = min(amount, budget, max_order_for_depth(liquidity))
     if amount < 1.0:
         return SizeDecision(0.0, 0.0, False, "size below $1 / budget exhausted")
     return SizeDecision(amount / price, amount, True, "approved")

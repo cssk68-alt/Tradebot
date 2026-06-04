@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-06-04T01:28:18.096745+00:00",
+  "generated_at": "2026-06-04T02:15:01.517703+00:00",
   "mode": "paper",
-  "starting_bankroll": 100.0,
-  "bankroll": 100.0,
+  "starting_bankroll": 1000.0,
+  "bankroll": 1000.0,
   "realized_pnl": 0,
   "n_trades": 0,
   "n_wins": 0,
@@ -19,11 +19,28 @@
     "losses": 0
   },
   "lessons": [],
+  "hold_recommendation": {
+    "status": "insufficient",
+    "n": 0,
+    "current": 600.0,
+    "recommended": 600.0,
+    "direction": "keep",
+    "message": "Zu wenig abgeschlossene Scalp-Trades fuer eine Haltedauer-Empfehlung (0/8, davon 0 Gewinner)."
+  },
+  "circuit_breaker": {
+    "tripped": false,
+    "reason": "",
+    "realized_today": 0.0,
+    "consecutive_losses": 0
+  },
   "config": {
-    "kelly_fraction": 0.55,
-    "edge_threshold": 0.05,
-    "confidence_threshold": 0.6,
-    "max_trade_pct": 0.12,
-    "brain_veto_threshold": 0.05
+    "kelly_fraction": 0.15,
+    "edge_threshold": 0.03,
+    "confidence_threshold": 0.55,
+    "max_trade_pct": 0.005,
+    "brain_veto_threshold": 0.1,
+    "max_spread": 0.03,
+    "max_daily_loss_pct": 0.05,
+    "max_consecutive_losses": 5
   }
 }

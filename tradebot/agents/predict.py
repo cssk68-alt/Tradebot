@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from tradebot.agents.base import Agent
+from tradebot.exchange.ticks import targets_collapse
 from tradebot.ml.features import build_brain_features, build_features
 from tradebot.models import Candidate, ResearchReport, Side, Signal
 from tradebot.risk.adjuster import risk_profile
@@ -78,6 +79,15 @@ class PredictAgent(Agent):
                 self.log.info(
                     "Predict: skip '%s' — spread %.3f eats target %.3f",
                     m.question[:40], m.spread, s.take_profit,
+                )
+                continue
+            # Tick-size guard (Teil B.5): block scalps whose take-profit or
+            # stop-loss exit collapses onto the entry on the price grid — such a
+            # trade can never realize its target and only ever pays the spread.
+            if s.strategy == "scalp" and targets_collapse(price, s.take_profit, s.stop_loss):
+                self.log.info(
+                    "Predict: skip '%s' — TP/SL collapse on tick grid at price %.3f",
+                    m.question[:40], price,
                 )
                 continue
 

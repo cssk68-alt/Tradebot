@@ -126,6 +126,10 @@ class Order(BaseModel):
     price: float
     size: float  # number of outcome shares
     mode: Mode
+    # Microstructure context the exchange needs to choose maker-vs-taker (Teil B.3)
+    # and that would otherwise be lost between the signal and execution.
+    edge: float = 0.0
+    spread: float = 0.0
 
     @property
     def cost(self) -> float:
@@ -144,6 +148,7 @@ class Trade(BaseModel):
     is_yes: bool = True
     status: str = "open"  # "open" | "resolved"
     kind: str = "resolve"  # "resolve" = hold to event; "scalp" = close on price
+    exec_style: str = ""  # "maker" | "taker" — how the entry was executed (Teil B.3)
     pnl: float = 0.0
     won: Optional[bool] = None
     resolved_yes: Optional[bool] = None

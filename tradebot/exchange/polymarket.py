@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from tradebot.exchange.base import Exchange, mark_yes_no, settle_from_resolution
+from tradebot.exchange.execution_style import decide_execution_style
+from tradebot.exchange.ticks import round_to_tick
 from tradebot.models import Market, Mode, Order, Trade
 
 
@@ -78,11 +80,15 @@ class PolymarketExchange(Exchange):
     def place_order(
         self, order: Order, confirm: Optional[Callable[[Order], bool]] = None
     ) -> Optional[Trade]:
+        # Maker-first decision (Teil B.3): when the edge is large enough, rest a
+        # passive maker bid for a window; otherwise take liquidity immediately.
+        plan = decide_execution_style(order.price, order.edge, order.spread, self.settings)
         if self.dry_run:
             self.log.info(
-                "[DRY-RUN] would place LIVE order: %s %s %.2f x %.1f (cost $%.2f) — not sent",
+                "[DRY-RUN] would place LIVE order: %s %s %.2f x %.1f (cost $%.2f) "
+                "exec=%s (%s) — not sent",
                 order.question, "YES" if order.is_yes else "NO",
-                order.price, order.size, order.cost,
+                order.price, order.size, order.cost, plan.style, plan.reason,
             )
             return None
         # SAFETY: real money — require explicit confirmation first.
@@ -93,18 +99,32 @@ class PolymarketExchange(Exchange):
         if client is None:
             self.log.error("No live client available; order not placed.")
             return None
-        try:  # pragma: no cover - needs live deps/keys
+
+        # Try the maker leg first; if it does not fill within the window, cancel
+        # it and fall through to a taker order (never leaves a stray resting order).
+        if plan.style == "maker":  # pragma: no cover - needs live deps/keys
+            trade = self._try_maker(client, order, plan)
+            if trade is not None:
+                return trade
+            self.log.info(
+                "Maker leg unfilled within timeout — falling back to taker for '%s'",
+                order.question[:40],
+            )
+        return self._place_taker(client, order)  # pragma: no cover - needs live deps/keys
+
+    def _place_taker(self, client, order: Order) -> Optional[Trade]:  # pragma: no cover
+        """Cross the spread with a marketable GTC order (the original execution path)."""
+        try:
             from py_clob_client.clob_types import OrderArgs, OrderType
             from py_clob_client.order_builder.constants import BUY
 
             args = OrderArgs(
-                token_id=order.token_id, price=round(order.price, 2),
+                token_id=order.token_id, price=round_to_tick(order.price),
                 size=order.size, side=BUY,
             )
-            signed = client.create_order(args)
-            resp = client.post_order(signed, OrderType.GTC)
-        except Exception as e:  # pragma: no cover
-            self.log.error("Live order failed: %s", e)
+            resp = client.post_order(client.create_order(args), OrderType.GTC)
+        except Exception as e:
+            self.log.error("Live taker order failed: %s", e)
             return None
 
         result = _parse_execution(resp)
@@ -112,21 +132,95 @@ class PolymarketExchange(Exchange):
             self.log.warning("Live order not accepted; no position opened: %s", result.raw)
             return None
         if result.filled_size <= 0:
-            # Accepted but resting (maker) — no position yet, so do NOT record a Trade.
+            # Accepted but resting — no position yet, so do NOT record a Trade.
             self.log.info(
                 "Live order accepted but unfilled (resting order %s); no trade recorded.",
                 result.order_id,
             )
             return None
         self.log.info(
-            "Live order filled: %.1f sh @ %s (id %s)",
+            "Live taker filled: %.1f sh @ %s (id %s)",
             result.filled_size, result.avg_price, result.order_id,
         )
+        return self._trade_from(order, result, "taker")
+
+    def _try_maker(self, client, order: Order, plan) -> Optional[Trade]:  # pragma: no cover
+        """Post a passive maker bid at plan.limit_price and poll for a fill up to
+        ``maker_timeout_seconds``. Returns a filled Trade, or None (after canceling
+        the resting order) so the caller can fall back to a taker order."""
+        import time as _t
+
+        try:
+            from py_clob_client.clob_types import OrderArgs, OrderType
+            from py_clob_client.order_builder.constants import BUY
+
+            args = OrderArgs(
+                token_id=order.token_id, price=round_to_tick(plan.limit_price),
+                size=order.size, side=BUY,
+            )
+            resp = client.post_order(client.create_order(args), OrderType.GTC)
+        except Exception as e:
+            self.log.error("Maker post failed (%s); will try taker.", e)
+            return None
+
+        result = _parse_execution(resp)
+        if not result.accepted:
+            self.log.warning("Maker order not accepted: %s", result.raw)
+            return None
+        if result.filled_size > 0:  # crossed immediately
+            self.log.info("Maker filled immediately: %.1f sh @ %s", result.filled_size, result.avg_price)
+            return self._trade_from(order, result, "maker")
+
+        order_id = result.order_id
+        timeout = float(getattr(self.settings, "maker_timeout_seconds", 60.0))
+        deadline = _t.time() + max(0.0, timeout)
+        self.log.info("Maker resting (id %s) up to %.0fs at %.3f", order_id, timeout, plan.limit_price)
+        while _t.time() < deadline:
+            _t.sleep(min(3.0, max(0.5, timeout / 10.0)))
+            status = self._order_status(client, order_id)
+            if status is not None and status.filled_size > 0:
+                self.log.info("Maker filled: %.1f sh @ %s", status.filled_size, status.avg_price)
+                return self._trade_from(order, status, "maker")
+
+        # Timed out unfilled: cancel so the taker leg cannot double-fill.
+        self._cancel(client, order_id)
+        return None
+
+    def _order_status(self, client, order_id) -> Optional["ExecutionResult"]:  # pragma: no cover
+        if not order_id:
+            return None
+        for name in ("get_order", "get_order_status"):
+            fn = getattr(client, name, None)
+            if fn is None:
+                continue
+            try:
+                return _parse_execution(fn(order_id))
+            except Exception as e:
+                self.log.warning("Maker status check failed (%s): %s", name, e)
+                return None
+        return None
+
+    def _cancel(self, client, order_id) -> None:  # pragma: no cover
+        if not order_id:
+            return
+        for name in ("cancel", "cancel_order"):
+            fn = getattr(client, name, None)
+            if fn is None:
+                continue
+            try:
+                fn(order_id)
+                self.log.info("Canceled resting maker order %s", order_id)
+                return
+            except Exception as e:
+                self.log.warning("Cancel of maker order %s failed (%s): %s", order_id, name, e)
+                return
+
+    def _trade_from(self, order: Order, result: "ExecutionResult", style: str) -> Trade:  # pragma: no cover
         return Trade(
             market_id=order.market_id, token_id=order.token_id, question=order.question,
             side=order.side, is_yes=order.is_yes,
             entry_price=result.avg_price if result.avg_price is not None else order.price,
-            size=result.filled_size, mode=Mode.LIVE, status="open",
+            size=result.filled_size, mode=Mode.LIVE, status="open", exec_style=style,
         )
 
     def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:
@@ -161,7 +255,7 @@ class PolymarketExchange(Exchange):
                 from py_clob_client.order_builder.constants import SELL
 
                 args = OrderArgs(
-                    token_id=trade.token_id, price=round(cur, 2),
+                    token_id=trade.token_id, price=round_to_tick(cur),
                     size=trade.size, side=SELL,
                 )
                 resp = client.post_order(client.create_order(args), OrderType.GTC)

@@ -101,6 +101,20 @@ const SETTINGS = [
     example: "1.000 USDC Mindestvolumen: Ein Markt mit 2.500 USDC Tagesvolumen wird analysiert. Einer mit 300 USDC wird ignoriert."
   },
   {
+    key: "max_spread",
+    label: "Maximaler Spread (Markt-Filter)",
+    unit: "%",
+    min: 0.5, max: 8, step: 0.5,
+    defaultStored: 0.03,
+    isPct: true,
+    desc: [
+      "Der Spread (Abstand zwischen bestem Kauf- und Verkaufspreis) ist auf Polymarket der dominante Kostenfaktor — er wird beim Ein- und Ausstieg bezahlt. Dieser Regler ersetzt die festen USDC-Schwellen als primärer Qualitätsfilter.",
+      "Märkte, deren Spread über diesem Wert liegt, werden gar nicht erst betrachtet — die Round-Trip-Kosten würden jeden kleinen Scalp-Gewinn auffressen. Ist das Orderbuch (Bid/Ask) noch nicht veröffentlicht, greift ersatzweise die Mindest-Liquidität.",
+      "Die Orderbuch-TIEFE gegen die geplante Ordergröße wird zusätzlich beim Sizing geprüft (max. 10% der sichtbaren Liquidität pro Order)."
+    ],
+    example: "3% Max-Spread: Ein Markt mit 1¢ Spread wird gehandelt. Einer mit 7¢ Spread (z.B. dünner Markt) wird übersprungen, weil 7¢ ein 2%-Ziel unmöglich machen."
+  },
+  {
     key: "edge_threshold",
     label: "Mindest-Edge",
     unit: "%",
@@ -253,6 +267,48 @@ const SETTINGS = [
       "Kürzere Haltedauer bedeutet mehr, schnellere Trades; längere gibt dem Preis mehr Zeit, dein Ziel zu erreichen."
     ],
     example: "300 Sekunden (5 Min): Tut sich nach 5 Minuten nichts, wird die Position glattgestellt und das Kapital ist wieder frei für den nächsten Trade."
+  },
+  {
+    key: "max_daily_loss_pct",
+    label: "Tagesverlust-Limit (Circuit-Breaker)",
+    unit: "%",
+    min: 0, max: 25, step: 1,
+    defaultStored: 0.05,
+    isPct: true,
+    desc: [
+      "Sicherung gegen schlechte Tage: Erreicht der realisierte Verlust eines Tages diesen Anteil der Bankroll, eröffnet der Bot KEINE neuen Trades mehr.",
+      "Offene Positionen werden dabei NICHT abgebrochen — sie laufen geordnet zu Ende (kein Abandon). Erst danach steht der Lauf still.",
+      "0% schaltet diese Sicherung aus. Der Zähler bezieht sich auf den heutigen Tag (UTC) und setzt sich um Mitternacht zurück."
+    ],
+    example: "5% bei 1.000 USD: Sind an einem Tag -50 USD realisiert, stoppt der Bot das Eröffnen neuer Trades und fährt die offenen kontrolliert herunter."
+  },
+  {
+    key: "max_consecutive_losses",
+    label: "Verlust-Streak-Limit (Circuit-Breaker)",
+    unit: "",
+    min: 0, max: 20, step: 1,
+    defaultStored: 5,
+    isPct: false,
+    desc: [
+      "Zweite Sicherung: Nach so vielen Verlust-Trades in Folge stoppt der Bot das Eröffnen neuer Positionen — ein Zeichen, dass das Marktregime gerade nicht zur Strategie passt.",
+      "Ein einzelner Gewinn setzt den Zähler zurück. Stornierte/ungültige Märkte zählen weder als Verlust noch setzen sie zurück.",
+      "0 schaltet diese Sicherung aus. Offene Trades werden auch hier geordnet beendet, nie abgebrochen."
+    ],
+    example: "5 in Folge: Verliert der Bot 5 Trades hintereinander, pausiert das Eröffnen. Gewinnt er zwischendrin einmal, läuft der Zähler wieder bei 0."
+  },
+  {
+    key: "maker_min_edge",
+    label: "Maker-First ab Edge (Kostenoptimierung)",
+    unit: "%",
+    min: 1, max: 15, step: 0.5,
+    defaultStored: 0.03,
+    isPct: true,
+    desc: [
+      "Maker-First spart Kosten: Statt sofort den Spread zu zahlen (Taker), legt der Bot bei ausreichend großem Edge eine passive Limit-Order einen Tick innerhalb des Preises und wartet kurz auf Ausführung (Polymarket-Maker-Gebühr = 0).",
+      "Dieser Regler bestimmt, AB welchem Edge sich das Warten lohnt. Darunter wird sofort als Taker ausgeführt (Geschwindigkeit vor Ersparnis).",
+      "Füllt die Maker-Order nicht innerhalb des Zeitfensters (Standard 60 s, nur Live relevant), schaltet der Bot automatisch auf eine Taker-Order um. Im Paper-Modus wird die gewählte Variante nur protokolliert."
+    ],
+    example: "3% Schwelle: Ein Trade mit 8% Edge wartet als Maker (spart den Spread). Ein Trade mit nur 2% Edge greift sofort als Taker zu."
   }
 ];
 
@@ -273,26 +329,29 @@ const SETTINGS = [
 const PRESETS = {
   vorsichtig: {
     aggressiveness: 0.0, kelly_fraction: 0.25, max_trade_pct: 0.01, max_exposure_pct: 0.10,
-    min_liquidity: 3000, min_volume_24h: 5000, edge_threshold: 0.08, confidence_threshold: 0.65,
-    brain_weight: 0.30, brain_veto_threshold: 0.40, max_slippage: 0.01,
+    min_liquidity: 3000, min_volume_24h: 5000, max_spread: 0.02, edge_threshold: 0.08,
+    confidence_threshold: 0.65, brain_weight: 0.30, brain_veto_threshold: 0.40, max_slippage: 0.01,
     min_days_to_resolution: 1.0, max_days_to_resolution: 30, take_profit: 0.03, stop_loss: 0.045,
     min_net_profit: 0.015, max_hold_seconds: 300,
+    max_daily_loss_pct: 0.03, max_consecutive_losses: 4, maker_min_edge: 0.02,
   },
   ausgewogen: {
     aggressiveness: 0.30, kelly_fraction: 0.40, max_trade_pct: 0.02, max_exposure_pct: 0.25,
-    min_liquidity: 1500, min_volume_24h: 2500, edge_threshold: 0.05, confidence_threshold: 0.60,
-    brain_weight: 0.30, brain_veto_threshold: 0.30, max_slippage: 0.02,
+    min_liquidity: 1500, min_volume_24h: 2500, max_spread: 0.03, edge_threshold: 0.05,
+    confidence_threshold: 0.60, brain_weight: 0.30, brain_veto_threshold: 0.30, max_slippage: 0.02,
     min_days_to_resolution: 1.0, max_days_to_resolution: 30, take_profit: 0.04, stop_loss: 0.06,
     min_net_profit: 0.01, max_hold_seconds: 450,
+    max_daily_loss_pct: 0.05, max_consecutive_losses: 5, maker_min_edge: 0.03,
   },
   aggressiv: {
     // Lockere GATES (viele Trades), aber KLEINSTER Einsatz (Exploration mit
     // gedeckeltem Downside) — bewusst temporär, bis das Brain ≥8 Ergebnisse hat.
     aggressiveness: 0.70, kelly_fraction: 0.15, max_trade_pct: 0.005, max_exposure_pct: 0.20,
-    min_liquidity: 800, min_volume_24h: 1500, edge_threshold: 0.03, confidence_threshold: 0.55,
-    brain_weight: 0.10, brain_veto_threshold: 0.10, max_slippage: 0.02,
+    min_liquidity: 800, min_volume_24h: 1500, max_spread: 0.05, edge_threshold: 0.03,
+    confidence_threshold: 0.55, brain_weight: 0.10, brain_veto_threshold: 0.10, max_slippage: 0.02,
     min_days_to_resolution: 0.5, max_days_to_resolution: 30, take_profit: 0.02, stop_loss: 0.03,
     min_net_profit: 0.005, max_hold_seconds: 600,
+    max_daily_loss_pct: 0.08, max_consecutive_losses: 8, maker_min_edge: 0.06,
   },
 };
 

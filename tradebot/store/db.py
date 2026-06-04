@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS trades (
     entry_price REAL, size REAL, mode TEXT, status TEXT, pnl REAL,
     won INTEGER, resolved_yes INTEGER, brain_score REAL, edge REAL,
     features TEXT, opened_at TEXT, resolved_at TEXT,
-    kind TEXT DEFAULT 'resolve', exit_price REAL
+    kind TEXT DEFAULT 'resolve', exit_price REAL, exec_style TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS experiences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +62,11 @@ class Store:
 
     def _migrate(self) -> None:
         """Add columns introduced after a DB was first created (old DBs)."""
-        for col, ddl in (("kind", "TEXT DEFAULT 'resolve'"), ("exit_price", "REAL")):
+        for col, ddl in (
+            ("kind", "TEXT DEFAULT 'resolve'"),
+            ("exit_price", "REAL"),
+            ("exec_style", "TEXT DEFAULT ''"),
+        ):
             try:
                 self.conn.execute(f"ALTER TABLE trades ADD COLUMN {col} {ddl}")
             except sqlite3.OperationalError:
@@ -92,14 +96,15 @@ class Store:
         cur = self.conn.execute(
             """INSERT INTO trades(market_id, token_id, question, side, is_yes,
                entry_price, size, mode, status, pnl, won, resolved_yes,
-               brain_score, edge, features, opened_at, resolved_at, kind, exit_price)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               brain_score, edge, features, opened_at, resolved_at, kind, exit_price,
+               exec_style)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 t.market_id, t.token_id, t.question, t.side.value, int(t.is_yes),
                 t.entry_price, t.size, t.mode.value, t.status, t.pnl, _b(t.won),
                 _b(t.resolved_yes), t.brain_score, t.edge, json.dumps(t.features),
                 t.opened_at.isoformat(), t.resolved_at.isoformat() if t.resolved_at else None,
-                t.kind, t.exit_price,
+                t.kind, t.exit_price, t.exec_style,
             ),
         )
         self.conn.commit()
@@ -133,6 +138,7 @@ class Store:
             resolved_at=datetime.fromisoformat(r["resolved_at"]) if r["resolved_at"] else None,
             kind=(r["kind"] if "kind" in keys and r["kind"] else "resolve"),
             exit_price=(r["exit_price"] if "exit_price" in keys else None),
+            exec_style=(r["exec_style"] if "exec_style" in keys and r["exec_style"] else ""),
         )
 
     def open_trades(self, mode: Optional[Mode] = None) -> list[Trade]:
@@ -161,6 +167,36 @@ class Store:
             (mode.value,),
         ).fetchone()
         return float(row["p"])
+
+    def realized_pnl_today(self, mode: Mode, now: Optional[datetime] = None) -> float:
+        """Realized PnL of trades resolved since 00:00 UTC today (circuit breaker)."""
+        now = now or datetime.now(timezone.utc)
+        start = now.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        row = self.conn.execute(
+            "SELECT COALESCE(SUM(pnl),0) AS p FROM trades "
+            "WHERE status='resolved' AND mode=? AND resolved_at >= ?",
+            (mode.value, start.isoformat()),
+        ).fetchone()
+        return float(row["p"])
+
+    def consecutive_losses(self, mode: Mode) -> int:
+        """Count of trailing losses among the most recently resolved trades.
+
+        Walks resolved trades newest-first and counts losses until the first win.
+        Void/canceled trades (won IS NULL) are excluded — they neither count as a
+        loss nor reset the streak."""
+        rows = self.conn.execute(
+            "SELECT won FROM trades WHERE status='resolved' AND mode=? AND won IS NOT NULL "
+            "ORDER BY resolved_at DESC, id DESC",
+            (mode.value,),
+        ).fetchall()
+        streak = 0
+        for r in rows:
+            if int(r["won"]) == 0:
+                streak += 1
+            else:
+                break
+        return streak
 
     # --- experiences (brain training data; mode-agnostic) ---
     def save_experience(self, e: Experience) -> None:

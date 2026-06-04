@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from tradebot.exchange.base import Exchange, mark_yes_no, settle_from_resolution
+from tradebot.exchange.execution_style import decide_execution_style
 from tradebot.models import Market, Mode, Order, Trade
 
 
@@ -28,10 +29,19 @@ class PaperExchange(Exchange):
     def place_order(
         self, order: Order, confirm: Optional[Callable[[Order], bool]] = None
     ) -> Optional[Trade]:
+        # Record which execution style WOULD be used live (Teil B.3). Paper keeps
+        # the real fill price (no invented maker advantage — consistent with the
+        # "no simulated outcomes" policy); the maker cost benefit only materializes
+        # in live mode. The label is logged so the decision is auditable in paper.
+        plan = decide_execution_style(order.price, order.edge, order.spread, self.settings)
+        self.log.info(
+            "Paper fill: %s %.0f sh @ %.3f  exec=%s (%s)",
+            "YES" if order.is_yes else "NO", order.size, order.price, plan.style, plan.reason,
+        )
         return Trade(
             market_id=order.market_id, token_id=order.token_id, question=order.question,
             side=order.side, is_yes=order.is_yes, entry_price=order.price, size=order.size,
-            mode=Mode.PAPER, status="open",
+            mode=Mode.PAPER, status="open", exec_style=plan.style,
         )
 
     def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:

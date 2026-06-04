@@ -12,6 +12,7 @@ from tradebot.agents.research import ResearchAgent
 from tradebot.agents.risk import RiskAgent
 from tradebot.agents.scan import ScanAgent
 from tradebot.brain.feedback import Brain
+from tradebot.brain.hold_analysis import recommend_max_hold, scalp_hold_seconds
 from tradebot.data.gamma import DataUnavailableError, GammaClient
 from tradebot.exchange.paper import PaperExchange
 from tradebot.exchange.polymarket import PolymarketExchange
@@ -19,6 +20,7 @@ from tradebot.llm import LLMUnavailableError, make_client
 from tradebot.ml.bootstrap import predictor_training_data
 from tradebot.ml.model import Predictor
 from tradebot.models import Experience, Mode
+from tradebot.risk.circuit_breaker import circuit_breaker_reason
 from tradebot.store.db import Store
 
 
@@ -61,6 +63,9 @@ class Orchestrator:
         self.manager = BrainManager(settings, self.store, log, self.client)
         self.risk = RiskAgent(settings, self.store, log, self.exchange, self.confirm)
         self.postmortem = PostmortemAgent(settings, self.store, log, self.client)
+        # Set by run_once when the circuit breaker trips, so a loop driver (server
+        # / CLI) can stop the run and wind down open positions gracefully.
+        self.breaker_reason = ""
 
         self._train_models()
 
@@ -72,6 +77,20 @@ class Orchestrator:
 
     def bankroll(self) -> float:
         return self.settings.bankroll + self.store.realized_pnl(self.mode)
+
+    def circuit_breaker_tripped(self) -> Optional[str]:
+        """Trip reason if the daily-loss / loss-streak breaker fires, else None."""
+        return circuit_breaker_reason(
+            self.store.realized_pnl_today(self.mode),
+            self.bankroll(),
+            self.store.consecutive_losses(self.mode),
+            self.settings,
+        )
+
+    def hold_recommendation(self) -> dict:
+        """Brain's empirical max-hold recommendation (Teil A.2) — advice only."""
+        won, lost = scalp_hold_seconds(self.store.resolved_trades(), self.mode)
+        return recommend_max_hold(won, lost, getattr(self.settings, "max_hold_seconds", 300.0))
 
     def _record_resolved(self, r) -> None:
         self.store.update_trade(r)
@@ -96,6 +115,11 @@ class Orchestrator:
         )
         self.postmortem.run(resolved)
         self._train_models()  # brain + predictor learn; carries over to live mode
+        # Surface the empirical max-hold advice when the distribution suggests a
+        # change (advice only — the slider stays the operator's).
+        rec = self.hold_recommendation()
+        if rec.get("status") == "ok" and rec.get("direction") != "keep":
+            self.log.info("Hold-Analyse: %s", rec["message"])
 
     def settle_open(self):
         """Hold-to-event settlement (the `settle` poller) — REAL resolution, no dice."""
@@ -158,6 +182,19 @@ class Orchestrator:
             self.log.error("HARD-FAIL: aborting cycle — %s", e)
             raise
         self.manage_open(markets)
+        # Circuit breaker (Teil B.2): check AFTER managing open trades (so today's
+        # realized PnL / streak are fresh) and BEFORE opening anything new. When it
+        # trips we open NOTHING this cycle; open positions are untouched (no abandon)
+        # and a loop driver can stop + wind down on seeing ``breaker_reason``.
+        self.breaker_reason = self.circuit_breaker_tripped() or ""
+        if self.breaker_reason:
+            self.log.warning(
+                "CIRCUIT BREAKER tripped (%s) — opening no new trades this cycle.",
+                self.breaker_reason,
+            )
+            self._export_dashboard()
+            self.log.info("=== Cycle done: circuit breaker active, 0 trades placed ===")
+            return []
         candidates = self.scan.run(markets)
         reports = self.research.run(candidates)
         signals = self.predict.run(candidates, reports)
@@ -165,7 +202,8 @@ class Orchestrator:
         # it can reach execution, and records its reasoning to the DB.
         approved = self.manager.run(signals, reports)
         liq = {c.market.id: c.market.liquidity for c in candidates}
-        placed = self.risk.run(approved, self.bankroll(), liq)
+        spreads = {c.market.id: c.market.spread for c in candidates}
+        placed = self.risk.run(approved, self.bankroll(), liq, spreads)
         self.log.info(
             "=== Cycle done: %d candidates, %d signals, %d approved, %d trades placed ===",
             len(candidates), len(signals), len(approved), len(placed),

@@ -2,6 +2,79 @@
 
 Stand: 2026-06-04 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
+## Microstructure-Verbesserungen: Tick / Spread / Circuit-Breaker / Maker-First / Hold-Analyse (neu, 2026-06-04)
+
+Umsetzung der `IMPLEMENTIERUNGSVORGABEN` — 5 Punkte umgesetzt, 2 bewusst ausgelassen.
+Jede Logik steckt in einem **reinen, getesteten Modul**; die Agenten/Exchange rufen es nur auf.
+
+### Punkt 7 — Tick-Size-Awareness (Teil B.5) — `tradebot/exchange/ticks.py`
+- `get_tick_size(price)`: 1¢-Raster im Normalbereich, 0,1¢-Raster nahe den Extremen
+  (≤0.05 / ≥0.95). `round_to_tick(price)`: Snap aufs gültige Raster (round-half-up).
+- `targets_collapse(entry, tp, sl)`: blockiert Scalps, deren TP/SL nach dem Runden auf
+  den Einstieg zusammenfallen (Move < ½ Tick → Trigger könnte nie feuern). Eingebaut in
+  `agents/predict.py` (neben dem Spread-Guard). Live-Orders (`polymarket.py`) submitten
+  jetzt mit `round_to_tick` statt `round(.,2)` → keine Reject wegen ungültiger Preise.
+
+### Punkt 1 — Spread-/Tiefen-Filter (Teil A.1) — `tradebot/risk/liquidity.py`
+- `passes_spread_filter(market, max_spread, min_liq)`: ersetzt die festen USDC-Gates im
+  Scan. Buch bekannt → Gate auf `spread <= max_spread` (dominanter Round-Trip-Kostenfaktor);
+  Buch unbekannt → Fallback auf Liquiditäts-Mindestfloor (nie einen Markt handeln, den man
+  nicht bepreisen kann). `min_volume_24h` ist **kein hartes Gate mehr** (nur noch Ranking).
+- **Orderbuch-Tiefe vs. Ordergröße** beim Sizing (`risk/kelly.py`): `depth_too_thin` lehnt
+  ab, wenn 10 % der sichtbaren Liquidität < $1; `max_order_for_depth` deckelt die Order auf
+  10 % der Tiefe. Neue Setting **`max_spread`** (Default 0.03), Slider auf Seite 2.
+- Wide-Spread-Flag ist jetzt relativ (`>= max(0.05, 0.6·max_spread)`).
+
+### Punkt 4 — Circuit-Breaker (Teil B.2) — `tradebot/risk/circuit_breaker.py`
+- `circuit_breaker_reason(realized_today, bankroll, streak, settings)`: trippt bei
+  **Tagesverlust** ≥ `max_daily_loss_pct` (Default 5 %) ODER **Verlust-Streak** ≥
+  `max_consecutive_losses` (Default 5). 0 = aus.
+- Store: `realized_pnl_today` (ab 00:00 UTC) + `consecutive_losses` (zählt Verluste bis zum
+  ersten Win; Voids zählen nicht). `orchestrator.run_once` prüft NACH `manage_open` und VOR
+  dem Öffnen → bei Trip: **kein neuer Trade**, `breaker_reason` gesetzt; `server._loop` bricht
+  ab und **fährt offene Trades sauber herunter (kein Abandon)**. CLI-`scalp`-Loop ebenso.
+
+### Punkt 5 — Maker-First-Execution (Teil B.3) — `tradebot/exchange/execution_style.py`
+- `decide_execution_style(price, edge, spread, settings)` → `ExecPlan(style, limit_price, reason)`.
+  Edge < `maker_min_edge` (Default 0.03) → **Taker** (sofort Liquidität). Edge groß genug →
+  **Maker**: passive Order 1 Tick innerhalb (≈ mid − 1 Tick), füllt sie nicht in
+  `maker_timeout_seconds` (Default 60 s) → Cancel + Taker-Fallback.
+- `Order` trägt jetzt `edge`/`spread` (von `RiskAgent` gesetzt, Spread über neue
+  `spread_by_market`-Map aus dem Orchestrator). `Trade.exec_style` (`"maker"|"taker"`) +
+  DB-Spalte + Migration + Dashboard. **Paper** protokolliert nur die gewählte Variante
+  (kein erfundener Maker-Vorteil — „no simulated outcomes"); **Live** (`polymarket.py`,
+  pragma no cover) fährt den echten Maker→Taker-Flow inkl. Poll/Cancel.
+
+### Punkt 2 — Max-Hold-Analyse (Teil A.2) — `tradebot/brain/hold_analysis.py`
+- `recommend_max_hold(won_holds, lost_holds, current)`: P50/P75/P95 der **Gewinner**-Haltezeiten,
+  Empfehlung ≈ P75 × 1.2 (clamped 30–600 s), Richtung erhöhen/senken/passt (10 %-Totband).
+  `scalp_hold_seconds(trades)` zieht die Haltezeiten aus resolved Scalps. **Nur Empfehlung** —
+  der Slider bleibt beim Nutzer. Ausgabe in Logs (`_after_resolved`) + `state.json`
+  (`hold_recommendation`) + Dashboard-Panel „Empfehlungen & Schutz".
+
+### Bewusst NICHT umgesetzt
+- **Punkt 3** (ε-Decay-Explorationsbudget): „Bot hat ausreichend trainiert" → entfällt.
+- **Punkt 6 der Vorgaben war Edge-Shrinkage bei kaltem Brain (Teil B.4): nicht gewünscht.**
+
+### Settings/UI
+- Neu in `config.py` + Server-DEFAULTS + `settings.js`: `max_spread`, `max_daily_loss_pct`,
+  `max_consecutive_losses`, `maker_min_edge` (Slider) sowie `maker_first`/`maker_timeout_seconds`
+  (config-only). Alle 3 Presets (vorsichtig/ausgewogen/aggressiv) um die neuen Keys ergänzt,
+  alle Werte rasterkonform verifiziert. Dashboard zeigt Hold-Empfehlung + Circuit-Breaker-Status.
+
+### Tests
+- **130 grün** (vorher 98, +32). Neu: `test_ticks.py`, `test_liquidity.py`,
+  `test_circuit_breaker.py`, `test_execution_style.py`, `test_hold_analysis.py`,
+  `test_predict_tick_guard.py`, `test_risk_exec_style.py`, `test_dashboard_state.py`.
+  `test_scan_filters.py` auf den neuen Spread-Filter umgeschrieben.
+
+### Kürzestes Intervall (Frage aus dem Vorlauf)
+- Harte Untergrenze im Server: **5 s** (`max(5.0, interval)`). Praktisch begrenzt der
+  serielle LLM-Zyklus (Scan→Research→Predict→BrainManager→Risk) die effektive Mindestdauer
+  auf einige Sekunden pro Markt — schneller bringt nichts, da jeder Zyklus auf die
+  Agent-Antworten wartet.
+
+
 ## Kontext-Handoff, Brain-Feature, Presets + Log-Trennung (neu, 2026-06-04)
 
 Vier Sachen in einem Rutsch — Antwort auf „wir machen alle 3 Empfehlungen + Presets".

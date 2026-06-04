@@ -17,10 +17,15 @@ class RiskAgent(Agent):
         self.confirm = confirm
 
     def run(
-        self, signals: list[Signal], bankroll: float, liquidity_by_market: dict[str, float]
+        self,
+        signals: list[Signal],
+        bankroll: float,
+        liquidity_by_market: dict[str, float],
+        spread_by_market: dict[str, float] | None = None,
     ) -> list[Trade]:
         placed: list[Trade] = []
         exposure = self.store.open_exposure(self.exchange.mode)
+        spread_by_market = spread_by_market or {}
 
         for sig in signals:
             liq = liquidity_by_market.get(sig.market_id, 1e9)
@@ -33,6 +38,8 @@ class RiskAgent(Agent):
                 market_id=sig.market_id, token_id=sig.token_id, question=sig.question,
                 side=sig.side, is_yes=sig.is_yes, price=sig.market_price,
                 size=decision.size, mode=self.exchange.mode,
+                # Microstructure context for the exchange's maker/taker choice.
+                edge=sig.edge, spread=spread_by_market.get(sig.market_id, 0.0),
             )
             trade = self.exchange.place_order(order, confirm=self.confirm)
             if trade is None:

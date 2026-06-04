@@ -11,7 +11,9 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tradebot.brain.hold_analysis import recommend_max_hold, scalp_hold_seconds
 from tradebot.models import Mode, Trade
+from tradebot.risk.circuit_breaker import circuit_breaker_reason
 
 
 def _trade_dict(t: Trade) -> dict:
@@ -19,6 +21,7 @@ def _trade_dict(t: Trade) -> dict:
         "question": t.question,
         "side": "YES" if t.is_yes else "NO",
         "kind": getattr(t, "kind", "resolve"),
+        "exec_style": getattr(t, "exec_style", "") or "",
         "entry": round(t.entry_price, 3),
         "exit": round(t.exit_price, 3) if t.exit_price is not None else None,
         "size": round(t.size, 1),
@@ -55,6 +58,18 @@ def build_state(store, settings, brain) -> dict:
         )
 
     exp_wins = sum(1 for e in experiences if e.won)
+
+    # Max-hold recommendation (Teil A.2) — advice only; the slider stays the user's.
+    won_holds, lost_holds = scalp_hold_seconds(resolved)
+    hold_rec = recommend_max_hold(
+        won_holds, lost_holds, getattr(settings, "max_hold_seconds", 300.0)
+    )
+
+    # Circuit-breaker status (Teil B.2) for the dashboard.
+    realized_today = store.realized_pnl_today(mode)
+    streak = store.consecutive_losses(mode)
+    cb_reason = circuit_breaker_reason(realized_today, start + store.realized_pnl(mode), streak, settings)
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mode": mode.value,
@@ -79,12 +94,22 @@ def build_state(store, settings, brain) -> dict:
             {"category": l.category, "cause": l.cause, "recommendation": l.recommendation}
             for l in store.recent_lessons(12)
         ],
+        "hold_recommendation": hold_rec,
+        "circuit_breaker": {
+            "tripped": bool(cb_reason),
+            "reason": cb_reason or "",
+            "realized_today": round(realized_today, 2),
+            "consecutive_losses": streak,
+        },
         "config": {
             "kelly_fraction": settings.kelly_fraction,
             "edge_threshold": settings.edge_threshold,
             "confidence_threshold": settings.confidence_threshold,
             "max_trade_pct": settings.max_trade_pct,
             "brain_veto_threshold": settings.brain_veto_threshold,
+            "max_spread": getattr(settings, "max_spread", 0.03),
+            "max_daily_loss_pct": getattr(settings, "max_daily_loss_pct", 0.0),
+            "max_consecutive_losses": getattr(settings, "max_consecutive_losses", 0),
         },
     }
 

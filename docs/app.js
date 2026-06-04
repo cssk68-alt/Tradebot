@@ -38,6 +38,7 @@ function render(s) {
 
   $("equityChart").innerHTML = equitySvg(s.equity_curve, s.starting_bankroll);
   $("brainPanel").innerHTML = brainPanel(s);
+  if ($("diagnostics")) $("diagnostics").innerHTML = diagnosticsHtml(s);
   $("resolvedTable").innerHTML = tradesTable(s.resolved_trades, true);
   $("openTable").innerHTML = tradesTable(s.open_trades, false);
   $("lessons").innerHTML = lessonsHtml(s.lessons);
@@ -85,6 +86,33 @@ function brainPanel(s) {
     `<p class="muted">The brain scores every setup; below <b>${esc(s.config.brain_veto_threshold)}</b> ` +
     `it vetoes the trade. Learned weights carry over from paper to live.</p>`
   );
+}
+
+function diagnosticsHtml(s) {
+  const hr = s.hold_recommendation || {};
+  const cb = s.circuit_breaker || {};
+  const dirTag = { raise: "↑ erhöhen", lower: "↓ senken", keep: "✓ passt" }[hr.direction] || "";
+  const holdNums = hr.status === "ok"
+    ? `<div class="muted" style="font-size:12px;margin-top:4px">aktuell ${hr.current}s · P50 ${hr.p50}s · ` +
+      `P75 ${hr.p75}s · P95 ${hr.p95}s · <b>empfohlen ${hr.recommended}s</b> (${esc(dirTag)})</div>`
+    : "";
+  const hold =
+    `<div style="padding:10px 0;border-bottom:1px solid #eef2f7">` +
+    `<b>Haltedauer-Empfehlung</b>` +
+    `<div class="muted">${esc(hr.message || "—")}</div>${holdNums}</div>`;
+
+  const tripped = !!cb.tripped;
+  const cbLine = tripped
+    ? `<span class="neg">■ AUSGELÖST — ${esc(cb.reason || "")}</span>`
+    : `<span class="pos">● aktiv und ruhig</span>`;
+  const breaker =
+    `<div style="padding:10px 0">` +
+    `<b>Circuit-Breaker (Verlustschutz)</b><div style="margin-top:4px">${cbLine}</div>` +
+    `<div class="muted" style="font-size:12px;margin-top:4px">heute realisiert ` +
+    `$${fmt(cb.realized_today != null ? cb.realized_today : 0)} · ` +
+    `${cb.consecutive_losses || 0} Verluste in Folge</div></div>`;
+
+  return hold + breaker;
 }
 
 function tradesTable(rows, resolved) {

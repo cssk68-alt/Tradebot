@@ -85,6 +85,9 @@ def scalp(
         i += 1
         log.info("---- scalp cycle %d ----", i)
         orch.run_once()
+        if orch.breaker_reason:  # circuit breaker: stop opening, then wind down
+            log.warning("Circuit breaker — stopping scalp loop: %s", orch.breaker_reason)
+            break
         if _time.time() >= deadline:
             break
         _time.sleep(interval)
@@ -108,7 +111,8 @@ def reset(
         raise typer.Exit(1)
     store = Store(s.db_path)
     store.conn.executescript(
-        "DELETE FROM trades; DELETE FROM experiences; DELETE FROM lessons; DELETE FROM snapshots;"
+        "DELETE FROM trades; DELETE FROM experiences; DELETE FROM lessons; "
+        "DELETE FROM snapshots; DELETE FROM manager_decisions;"
     )
     store.conn.commit()
     bp = Path(s.brain_path)

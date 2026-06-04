@@ -45,10 +45,29 @@ class Settings(BaseSettings):
     max_exposure_pct: float = 0.5
     min_liquidity: float = 500.0
     min_volume_24h: float = 1000.0
+    # Spread-based market-quality gate (Teil A.1): the bid/ask spread is the
+    # dominant round-trip cost on Polymarket, so the scan filters on it directly.
+    # min_liquidity is kept only as a fallback when the book is not yet published
+    # and as the order-book DEPTH source for sizing (risk/kelly).
+    max_spread: float = 0.03
     edge_threshold: float = 0.05
     confidence_threshold: float = 0.6
     brain_weight: float = 0.3
     brain_veto_threshold: float = 0.35
+
+    # Circuit breaker (Teil B.2): stop opening NEW trades when the day's realized
+    # loss or a losing streak hits its limit. Open positions are never abandoned —
+    # the loop winds them down gracefully. 0 disables that arm.
+    max_daily_loss_pct: float = 0.05
+    max_consecutive_losses: int = 5
+
+    # Maker-first execution (Teil B.3): when the edge is large enough, rest a
+    # passive maker bid one tick inside the price for up to maker_timeout_seconds
+    # (Polymarket maker fee = 0), then fall back to a taker order. Edge below
+    # maker_min_edge always takes liquidity immediately.
+    maker_first: bool = True
+    maker_min_edge: float = 0.03
+    maker_timeout_seconds: float = 60.0
     # Manual 'Aggressivitäts-Regler' (Risk-Adjuster), 0..1. A single operator knob
     # that loosens the veto/confidence/edge gates at RUNTIME via risk/adjuster.py
     # WITHOUT touching the maths. 0 = conservative (base thresholds), 1 = bold.

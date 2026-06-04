@@ -25,6 +25,7 @@ DEFAULTS: dict = {
     "max_exposure_pct": 0.5,
     "min_liquidity": 500.0,
     "min_volume_24h": 1000.0,
+    "max_spread": 0.03,  # spread-based market-quality gate (Teil A.1)
     "edge_threshold": 0.05,
     "confidence_threshold": 0.6,
     "brain_weight": 0.3,
@@ -33,6 +34,13 @@ DEFAULTS: dict = {
     "max_slippage": 0.02,
     "min_days_to_resolution": 1.0,
     "max_days_to_resolution": 30.0,
+    # circuit breaker (Teil B.2) — 0 disables that arm
+    "max_daily_loss_pct": 0.05,
+    "max_consecutive_losses": 5,
+    # maker-first execution (Teil B.3)
+    "maker_first": True,
+    "maker_min_edge": 0.03,
+    "maker_timeout_seconds": 60.0,
     # short-horizon scalping
     "max_hold_seconds": 300.0,
     "take_profit": 0.02,
@@ -178,6 +186,12 @@ class _Runner:
                 placed = orch.run_once()
                 self.cost = orch.client.cost_eur
                 self.last = f"Zyklus {self.cycle}: {len(placed)} Trade(s), €{self.cost:.4f}"
+                # Circuit breaker (Teil B.2): stop opening new trades, then wind
+                # down the open ones gracefully (no abandon).
+                if orch.breaker_reason:
+                    self.stop_reason = f"Circuit-Breaker: {orch.breaker_reason}"
+                    self.log.warning("Stopping run — %s", self.stop_reason)
+                    break
                 self._stop.wait(self.interval)
             # Stop / cap reached: don't abandon live positions — wind down (open
             # nothing new, but keep closing the open ones until the book is flat).
