@@ -241,27 +241,36 @@ async function _postJSON(path, body) {
 }
 
 function renderRunStatus(st) {
-  const tl     = $("trafficLight");
-  const label  = $("tlLabel");
-  const badge  = $("runStatus");
   const running  = !!(st && st.running);
   const draining = !!(st && st.draining);
   const hasError = !!(st && st.error);
   const eur = st && st.cost ? ` · €${Number(st.cost).toFixed(4)}` : "";
 
-  // Ampel-Zustand setzen
+  // --- Ampel: rein visuell ---
   const state = !_apiOk  ? "disabled" :
                 hasError ? "panic"    :
                 draining ? "draining" :
                 running  ? "running"  : "stopped";
-  if (tl)    tl.className    = "tl-housing " + state;
-  if (label) label.textContent =
-    state === "disabled" ? "offline"          :
-    state === "panic"    ? "Fehler"           :
-    state === "draining" ? "Stopp…"           :
-    state === "running"  ? `Zyklus ${st.cycle}` : "Stopp";
+  const tl = $("trafficLight"), lbl = $("tlLabel");
+  if (tl)  tl.className     = "tl-housing " + state;
+  if (lbl) lbl.textContent  =
+    state === "disabled" ? "Offline"    :
+    state === "panic"    ? "Fehler"     :
+    state === "draining" ? "Stoppt …"  :
+    state === "running"  ? "Läuft"     : "Gestoppt";
 
-  // Info-Badge (Modus + Kosten)
+  // --- Buttons ---
+  const start = $("startBtn"), stop = $("stopBtn");
+  if (start && stop) {
+    start.disabled     = running;
+    stop.disabled      = !running;
+    stop.textContent   = draining ? "■ Sofort abbrechen" : "■ Stop";
+    start.style.opacity = running ? 0.5 : 1;
+    stop.style.opacity  = running ? 1   : 0.5;
+  }
+
+  // --- Info-Badge ---
+  const badge = $("runStatus");
   if (badge) {
     badge.textContent = draining
       ? `beende Trades…${eur}`
@@ -285,13 +294,14 @@ async function pollStatus() {
     if (st.running) load();
   } catch (e) {
     if (!_apiOk) {
-      // GitHub Pages oder kein Server — Ampel zeigt "offline"
-      const tl = $("trafficLight");
-      if (tl) tl.className = "tl-housing disabled";
-      const lbl = $("tlLabel");
-      if (lbl) lbl.textContent = "offline";
+      const tl = $("trafficLight"), lbl = $("tlLabel");
+      if (tl)  tl.className    = "tl-housing disabled";
+      if (lbl) lbl.textContent = "Offline";
       const badge = $("runStatus");
       if (badge) badge.textContent = "—";
+      const start = $("startBtn"), stop = $("stopBtn");
+      if (start) { start.disabled = true; start.style.opacity = 0.5; }
+      if (stop)  { stop.disabled  = true; stop.style.opacity  = 0.5; }
       $("runMsg").textContent = "Steuerung nur lokal: python -m tradebot.cli serve";
     }
   }
@@ -330,46 +340,38 @@ function wireControls() {
   };
   loadRunParams();
 
-  // --- Ampel-Klick: startet oder stoppt den Bot ---
-  $("trafficLight").addEventListener("click", async () => {
-    const tl    = $("trafficLight");
-    const state = ["stopped","running","draining","starting","panic","disabled"]
-                    .find(s => tl.classList.contains(s)) || "stopped";
-    if (state === "disabled") return;
-
-    if (state === "stopped" || state === "panic") {
-      // ▶ Starten
-      const mode     = modeSel.value;
-      const interval = parseFloat(iv.value) || 60;
-      const body = {
-        mode, strategy: "scalp", interval,
-        max_eur:     parseFloat(eur.value) || 0,
-        max_runtime: (parseFloat(rt.value) || 0) * 60,
-      };
-      if (mode === "live") {
-        if (!$("liveAck").checked || $("liveConfirm").value.trim() !== "LIVE") {
-          $("runMsg").textContent = "Live abgebrochen: Häkchen setzen und LIVE eintippen.";
-          return;
-        }
-        if (!window.confirm("WIRKLICH live mit ECHTEM GELD starten?")) return;
-        body.confirm = "LIVE";
+  // --- Start-Button ---
+  $("startBtn").addEventListener("click", async () => {
+    const mode     = modeSel.value;
+    const interval = parseFloat(iv.value) || 60;
+    const body = {
+      mode, strategy: "scalp", interval,
+      max_eur:     parseFloat(eur.value) || 0,
+      max_runtime: (parseFloat(rt.value) || 0) * 60,
+    };
+    if (mode === "live") {
+      if (!$("liveAck").checked || $("liveConfirm").value.trim() !== "LIVE") {
+        $("runMsg").textContent = "Live abgebrochen: Häkchen setzen und LIVE eintippen.";
+        return;
       }
-      // Gelb zeigen während der API-Call läuft
-      tl.className = "tl-housing starting";
-      $("tlLabel").textContent = "Start…";
-      const r = await _postJSON("/api/run", body);
-      if (!r.ok) {
-        $("runMsg").textContent = "Start fehlgeschlagen: " + (r.error || "");
-        tl.className = "tl-housing stopped";
-        $("tlLabel").textContent = "Stopp";
-      }
-    } else {
-      // ■ Stoppen (graceful oder hart wenn draining)
-      const r = await _postJSON("/api/stop", {});
-      $("runMsg").textContent = (r && r.forcing)
-        ? "Hart-Stopp: laufende Trades werden NICHT mehr beendet (settle übernimmt)."
-        : "Stop: keine neuen Trades. Offene Positionen werden noch zu Ende geführt.";
+      if (!window.confirm("WIRKLICH live mit ECHTEM GELD starten?")) return;
+      body.confirm = "LIVE";
     }
+    // Ampel schon mal auf Gelb setzen während API antwortet
+    const tl = $("trafficLight"), lbl = $("tlLabel");
+    if (tl)  tl.className    = "tl-housing starting";
+    if (lbl) lbl.textContent = "Startet …";
+    const r = await _postJSON("/api/run", body);
+    if (!r.ok) $("runMsg").textContent = "Start fehlgeschlagen: " + (r.error || "");
+    pollStatus();
+  });
+
+  // --- Stop-Button ---
+  $("stopBtn").addEventListener("click", async () => {
+    const r = await _postJSON("/api/stop", {});
+    $("runMsg").textContent = (r && r.forcing)
+      ? "Hart-Stopp: laufende Trades werden NICHT mehr beendet (settle übernimmt)."
+      : "Stop: keine neuen Trades. Offene Positionen werden noch zu Ende geführt.";
     pollStatus();
   });
 }

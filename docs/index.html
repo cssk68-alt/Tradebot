@@ -23,16 +23,9 @@
   <main>
     <section class="panel" id="controlPanel">
       <h2>Steuerung</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">
-        <!-- Ampel ersetzt Start/Stop-Knöpfe -->
-        <div class="tl-wrap">
-          <div class="tl-housing stopped" id="trafficLight" title="Klicken zum Starten / Stoppen">
-            <div class="tl-dot"></div>
-            <div class="tl-dot"></div>
-            <div class="tl-dot"></div>
-          </div>
-          <span class="tl-label" id="tlLabel">Stopp</span>
-        </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <button id="startBtn" type="button" style="padding:8px 18px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#16a34a;color:#fff">▶ Start</button>
+        <button id="stopBtn" type="button" disabled style="padding:8px 18px;border:0;border-radius:8px;font-weight:700;cursor:pointer;background:#dc2626;color:#fff;opacity:.5">■ Stop</button>
         <label style="font-size:13px;color:#374151">Modus
           <select id="runMode" style="margin-left:4px">
             <option value="paper" selected>Paper (Simulation)</option>
@@ -42,7 +35,16 @@
         <label style="font-size:13px;color:#374151" title="Sekunden Pause zwischen zwei Durchläufen (Scan→Research→Trade). Höher = seltener prüfen, weniger API-Kosten. Minimum 5 s.">Pause/Zyklus
           <input id="runInterval" type="number" value="60" min="5" style="width:60px;margin-left:4px" /> Sek.
         </label>
-        <span id="runStatus" class="badge">idle</span>
+        <span id="runStatus" class="badge">—</span>
+      </div>
+      <!-- Ampel: visueller Systemzustand (nur Anzeige, kein Klick) -->
+      <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+        <div class="tl-housing stopped" id="trafficLight">
+          <div class="tl-dot"></div>
+          <div class="tl-dot"></div>
+          <div class="tl-dot"></div>
+        </div>
+        <span class="tl-label" id="tlLabel">Gestoppt</span>
       </div>
       <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:24px">
         <label style="font-size:13px;color:#374151">
