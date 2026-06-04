@@ -39,9 +39,18 @@ class Exchange(ABC):
         """Execute an order. Returns the opened Trade, or None if not placed."""
 
     @abstractmethod
-    def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:
+    def settle(
+        self,
+        trade: Trade,
+        force_yes: Optional[bool] = None,
+        resolution: Optional[Resolution] = None,
+    ) -> Optional[Trade]:
         """Resolve an open trade if its market has resolved. Returns the resolved
-        Trade (status='resolved', pnl/won set) or None if still open."""
+        Trade (status='resolved', pnl/won set) or None if still open.
+
+        ``resolution``: a pre-fetched Resolution to settle from, so a caller that
+        already queried ``gamma.get_resolution`` (e.g. the missing-market path) need
+        not fetch it twice."""
 
     @abstractmethod
     def close(self, trade: Trade, market: Market, reason: str = "time") -> Optional[Trade]:

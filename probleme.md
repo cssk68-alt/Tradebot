@@ -76,3 +76,42 @@ Umgebungsgrenzen), mit Wissensstand und Lösungsweg für deinen Rechner.
   Gehirn dort echten Vorsprung lernt, lohnt der Live-Schritt.
 - **Live-Scalp-Verkauf** (`PolymarketExchange.close`): postet eine SELL-Order
   (defensiv, `dry_run` loggt nur). Ohne Keys/Netz hier nicht real gesendet.
+- **Behoben — Trade bleibt nie mehr still „offen", wenn der Markt aus
+  `list_markets()` verschwindet** (z. B. UFC-Kampf vorbei → Settling, oder Markt
+  unter den Liquiditätsfilter gefallen). Früher: `manage_open` machte bei fehlendem
+  Bulk-Preis ein stilles `continue` → Trade ewig offen, kein Log. Jetzt holt sich
+  `Orchestrator._close_missing` aktiv per **Einzel-Direktabruf**, was zum Schließen
+  nötig ist: (1) echte Resolution über `gamma.get_resolution` → real setteln; (2)
+  noch offener Markt → `gamma.fetch_market` (neuer Einzel-Preisabruf `/markets/{id}`)
+  → normaler Scalp-Trigger (max_hold garantiert Schließen); (3) erst wenn weder
+  Resolution noch Preis verfügbar sind, lautes Error-Log statt stillem Schlucken.
+  Gilt in Paper UND Live sowie im Wind-down. Tests: `tests/test_close_missing.py`.
+- **Maker-First jetzt ehrlich in Paper modelliert** (vorher: Paper füllte immer zum
+  Referenzpreis und protokollierte den Stil nur — der Maker-Nutzen war unsichtbar).
+  Eine Maker-Order wird in Paper **nicht** auf Verdacht zum besseren Preis gefüllt
+  (das wäre zu optimistisch: ein ruhendes Gebot füllt gerade dann, wenn der Preis
+  kippt → adverse selection). Stattdessen ruht sie als `pending_maker` zum Limit, und
+  `Orchestrator.resolve_pending_makers` bestätigt den Fill **aus dem echten Preispfad**
+  (Snapshots + aktueller Live-Preis): erreicht der Preis das Gebot im Fenster → Fill
+  zum besseren Limit (Scalp-Uhr startet beim Fill); sonst **verpasst → Taker** zum
+  aktuellen Preis (echter Live-Fallback); stale/Markt weg → storniert (`canceled`,
+  nicht ins Brain). Kein erfundener Vorteil — exakt die „nur echte Daten"-Linie wie
+  Counterfactuals. Grenze (ehrlich): Snapshot-Takt ~1×/Zyklus ist grob, daher eher
+  konservativ; für feinere Auflösung Intervall senken. Live unverändert (echtes CLOB
+  bestätigt den Fill in `place_order`). Tests: `tests/test_maker_fill.py`.
+- **Behoben — Billig-Markt-Scalp verlor ein Vielfaches des Einsatzes** (realer Fall:
+  „Elon 260-279 tweets", Entry 0.0015, Einsatz $2,52 → **−$16,80**). Ursache: der
+  Spread-Floor war ein flacher Absolutwert `min_spread_cost=0.01`, angewandt auf einen
+  Markt unter 1 Cent. Weil `size = Einsatz/Preis` bei winzigem Preis explodiert
+  (1679 Anteile), wurde `size × 0.01` zum Vielfachen des Einsatzes. Drei Trades:
+  $9 Einsatz → −$91 PnL. Dreifach-Fix:
+  **(A)** Verlust-Deckel `pnl = max(pnl, -size*entry)` — ein Long kann nie mehr als den
+  Einsatz verlieren (in beiden `close()` + `settle_scalp_path`).
+  **(B)** Spread-Floor = `min(min_spread_cost, get_tick_size(entry))` — ein Tick ist das
+  realistische Minimum; Normalbereich unverändert (0,01), Extreme 0,001.
+  **(C)** Einstiegs-Guard in `predict.py`: kein Scalp wenn `price ≤ stop_loss` (Stop läge
+  unter 0, unerreichbar) oder `price + take_profit ≥ 1` — solche Longshots auch wegen der
+  Size-Explosion meiden. Hold-to-event (resolve) ist davon nicht betroffen.
+  Wirkung auf die 3 realen Trades: −$91,22 → −$8,18 (und C hätte alle drei verhindert).
+  Gleicher Fix in der Counterfactual-Replay → das Gehirn lernt keine Phantom-Verluste
+  mehr. Tests: `test_paper_exchange.py`, `test_counterfactual.py`, `test_predict_tick_guard.py`.

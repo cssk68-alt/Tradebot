@@ -4,7 +4,7 @@ from tradebot.config import Settings
 from tradebot.data.gamma import GammaClient
 from tradebot.exchange.paper import PaperExchange
 from tradebot.log import get_logger
-from tradebot.models import Market, Mode, Order, Side
+from tradebot.models import Market, Mode, Order, Side, Trade
 
 
 def _ex(tmp):
@@ -76,3 +76,29 @@ def test_scalp_no_side_uses_complement_price(tmp_path):
     r = ex.close(tr, _market(yes=0.40, bid=0.398, ask=0.402), reason="take_profit")
     # NO price now 1 - 0.40 = 0.60; pnl = 100*(0.60 - 0.55 - 0.01) = 4.0
     assert r.won is True and abs(r.pnl - 4.0) < 1e-6
+
+
+def _open_trade(entry, size, is_yes=True):
+    return Trade(market_id="m", token_id="t", question="q", side=Side.BUY,
+                 is_yes=is_yes, entry_price=entry, size=size, mode=Mode.PAPER, status="open")
+
+
+def test_lowprice_scalp_spread_floor_is_tick(tmp_path):
+    # Regression (the Elon −16.80 bug): a 0.0015 longshot buys a huge share count
+    # (size = stake/price ≈ 1680 for a $2.52 stake). The OLD flat 0.01 spread floor ×
+    # 1680 shares lost $16.80 on a $2.52 stake. Now the floor is one tick (0.001 near
+    # the extremes), so a flat exit loses ~$1.68 — never the phantom $16.80.
+    ex = _ex(tmp_path)
+    r = ex.close(_open_trade(0.0015, 1679.7), _market(yes=0.0015, bid=0.001, ask=0.002), "time")
+    assert abs(r.pnl - (-1.68)) < 0.01          # size × tick(0.001), not size × 0.01
+    assert r.pnl > -16.0                          # nowhere near the old catastrophe
+
+
+def test_long_scalp_loss_capped_at_stake(tmp_path):
+    # A long can never lose more than its stake (price floors at 0). Even if the price
+    # crashes to ~0, the loss is capped at size × entry — not blown past it by the
+    # spread term × a huge share count.
+    ex = _ex(tmp_path)
+    stake = 1679.7 * 0.0015
+    r = ex.close(_open_trade(0.0015, 1679.7), _market(yes=0.0, bid=0.0, ask=0.001), "stop_loss")
+    assert abs(r.pnl - (-stake)) < 1e-6          # exactly the stake, the cap binds

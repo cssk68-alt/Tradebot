@@ -146,7 +146,7 @@ class Trade(BaseModel):
     size: float
     mode: Mode
     is_yes: bool = True
-    status: str = "open"  # "open" | "resolved"
+    status: str = "open"  # "open" | "resolved" | "pending_maker" (resting bid) | "canceled"
     kind: str = "resolve"  # "resolve" = hold to event; "scalp" = close on price
     exec_style: str = ""  # "maker" | "taker" — how the entry was executed (Teil B.3)
     pnl: float = 0.0

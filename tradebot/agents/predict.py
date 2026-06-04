@@ -90,6 +90,18 @@ class PredictAgent(Agent):
                     m.question[:40], price,
                 )
                 continue
+            # Extreme-price guard: a scalp needs room on BOTH sides of the entry. If
+            # the traded-side price is below the stop-loss distance, the stop exit sits
+            # at/below 0 (unreachable — no downside control); if take-profit lands
+            # at/above 1 it can never trigger. Such longshots also explode the share
+            # count (size = stake/price), so a flat exit's per-share spread dwarfs the
+            # stake (the −16.80-on-$2.52 case). Hold-to-event (resolve) is unaffected.
+            if s.strategy == "scalp" and (price <= s.stop_loss or price + s.take_profit >= 1.0):
+                self.log.info(
+                    "Predict: skip '%s' — Preis %.4f zu nah am 0/1-Rand fuer Scalp "
+                    "(SL/TP unerreichbar)", m.question[:40], price,
+                )
+                continue
 
             # Score the actual trade (direction + edge), not a generic setup, and
             # apply the CONFIGURED brain_weight (was hard-coded before).

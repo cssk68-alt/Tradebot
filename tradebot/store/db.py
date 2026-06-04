@@ -192,14 +192,37 @@ class Store:
             rows = self.conn.execute("SELECT * FROM trades WHERE status='open'").fetchall()
         return [self._row_to_trade(r) for r in rows]
 
+    def pending_maker_trades(self, mode: Optional[Mode] = None) -> list[Trade]:
+        """Resting paper maker orders awaiting a fill decision (``resolve_pending_makers``).
+        Not yet positions — excluded from ``open_trades`` and settlement."""
+        if mode:
+            rows = self.conn.execute(
+                "SELECT * FROM trades WHERE status='pending_maker' AND mode=?", (mode.value,)
+            ).fetchall()
+        else:
+            rows = self.conn.execute("SELECT * FROM trades WHERE status='pending_maker'").fetchall()
+        return [self._row_to_trade(r) for r in rows]
+
+    def open_pending_trade(self, t: Trade) -> None:
+        """Promote a resting maker order to an open position once its fill is decided:
+        persist the confirmed status, entry price, fill time and exec_style."""
+        self.conn.execute(
+            "UPDATE trades SET status=?, entry_price=?, opened_at=?, exec_style=? WHERE id=?",
+            (t.status, t.entry_price, t.opened_at.isoformat(), t.exec_style, t.id),
+        )
+        self.conn.commit()
+
     def resolved_trades(self) -> list[Trade]:
         rows = self.conn.execute("SELECT * FROM trades WHERE status='resolved'").fetchall()
         return [self._row_to_trade(r) for r in rows]
 
     def open_exposure(self, mode: Mode) -> float:
+        # Resting maker orders (pending_maker) commit capital at the bid too, so they
+        # count toward exposure until they fill or are cancelled — no over-allocation
+        # while a bid rests. (No-op for live, which never has pending_maker rows.)
         row = self.conn.execute(
             "SELECT COALESCE(SUM(entry_price*size),0) AS e FROM trades "
-            "WHERE status='open' AND mode=?", (mode.value,),
+            "WHERE status IN ('open','pending_maker') AND mode=?", (mode.value,),
         ).fetchone()
         return float(row["e"])
 

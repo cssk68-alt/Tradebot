@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from tradebot.exchange.ticks import get_tick_size
+
 
 def _utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
@@ -51,8 +53,12 @@ def settle_scalp_path(
     cutoff = max_hold * max_settle_factor  # ignore ticks observed far past the window
 
     def _settled(cur: float, spread: float, reason: str) -> dict:
-        cost = max(spread, spread_floor)
-        pnl = size * (cur - entry_price - cost)
+        # Spread floor = one tick at the entry price (realistic minimum), capped by
+        # spread_floor — a flat absolute floor (0.01) is nonsensical at extreme-low
+        # prices and would teach the brain phantom catastrophic losses. The long's
+        # loss is also bounded at the stake (price floors at 0).
+        cost = max(spread, min(spread_floor, get_tick_size(entry_price)))
+        pnl = max(size * (cur - entry_price - cost), -size * entry_price)
         return {
             "status": "settled", "exit_price": round(cur, 4), "pnl": pnl,
             "won": pnl > 0, "exit_reason": reason,

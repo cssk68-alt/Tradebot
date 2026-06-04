@@ -82,7 +82,8 @@ function render(s) {
     kpi("Bankroll", "$" + fmt(s.bankroll), `start $${fmt(s.starting_bankroll)}`),
     kpi("Realized PnL", ((s.realized_pnl || 0) >= 0 ? "+" : "") + "$" + fmt(s.realized_pnl), "", pnlClass),
     kpi("Win rate", pct(s.win_rate), `${s.n_wins || 0}W / ${s.n_losses || 0}L`),
-    kpi("Trades", s.n_trades || 0, `${s.n_open || 0} open`),
+    kpi("Trades", s.n_trades || 0,
+      `${s.n_open || 0} open` + (s.n_pending_maker ? ` · ${s.n_pending_maker} Maker ruht` : "")),
     kpi("Brain", brain.trained ? "Trained" : "Cold start", `${brain.experiences || 0} experiences`,
       brain.trained ? "pos" : ""),
   ].join("");
@@ -93,7 +94,10 @@ function render(s) {
   if ($("brainDiag")) $("brainDiag").innerHTML = brainDiagHtml(s);
   $("resolvedTable").innerHTML = tradesTable(s.resolved_trades, true);
   const maxHold = config.max_hold_seconds || 300;
-  $("openTable").innerHTML = stuckWarning(s.open_trades, maxHold) + tradesTable(s.open_trades, false);
+  const makerNote = s.n_pending_maker
+    ? `<div class="empty" style="text-align:left;padding:6px 0;color:var(--muted)">⏳ ${s.n_pending_maker} Maker-Gebot(e) ruhen — Fill wird aus dem echten Preispfad bestätigt (noch keine Position).</div>`
+    : "";
+  $("openTable").innerHTML = makerNote + stuckWarning(s.open_trades, maxHold) + tradesTable(s.open_trades, false);
   $("lessons").innerHTML = lessonsHtml(s.lessons);
 }
 

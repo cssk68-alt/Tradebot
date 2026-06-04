@@ -93,6 +93,27 @@ class GammaClient:
                 break
         return out[: self.limit]
 
+    def fetch_market(self, market_id: str) -> Optional[Market]:
+        """Direct single-market fetch (``/markets/{id}``) for a position whose market
+        has dropped out of the bulk ``fetch_markets()`` list (below the liquidity
+        filter, or temporarily inactive). Returns a Market with the CURRENT book.
+
+        Returns None when the market is unknown or carries no usable price data — so
+        a caller never closes a position at the fabricated 0.5 default ``_parse``
+        would otherwise yield. Resolved/closed markets are handled by
+        ``get_resolution`` instead; this path is for markets that are still trading.
+        """
+        try:
+            data = self._get(f"/markets/{market_id}", {})
+        except Exception as e:
+            self.log.warning("Gamma single-market fetch failed for %s: %s", market_id, e)
+            return None
+        if isinstance(data, list):
+            data = data[0] if data else {}
+        if not isinstance(data, dict) or not _loads(data.get("outcomePrices")):
+            return None
+        return self._parse(data)
+
     def get_resolution(self, market_id: str) -> Resolution:
         """Typed settlement status (OPEN / YES / NO / CANCELED / AMBIGUOUS / ERROR).
 

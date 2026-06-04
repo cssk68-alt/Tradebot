@@ -40,6 +40,7 @@ def build_state(store, settings, brain) -> dict:
     resolved = [t for t in store.resolved_trades() if t.mode == mode]
     resolved.sort(key=lambda t: t.resolved_at or t.opened_at)
     open_trades = store.open_trades(mode)
+    pending_makers = store.pending_maker_trades(mode)  # resting bids awaiting a fill
     experiences = store.load_experiences()
 
     n = len(resolved)
@@ -90,6 +91,7 @@ def build_state(store, settings, brain) -> dict:
         "n_losses": n - wins,
         "win_rate": round(wins / n, 4) if n else 0.0,
         "n_open": len(open_trades),
+        "n_pending_maker": len(pending_makers),  # resting maker bids (paper), not yet positions
         "open_trades": [_trade_dict(t) for t in open_trades],
         "resolved_trades": [_trade_dict(t) for t in resolved][-50:],
         "equity_curve": equity[-300:],

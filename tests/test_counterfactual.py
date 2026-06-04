@@ -71,4 +71,16 @@ def test_spread_cost_is_floored():
     series = [(_ts(60), 0.50, 0.0), (_ts(360), 0.50, 0.0)]  # flat, no observed spread
     r = settle_scalp_path(0.50, True, series, BASE, take_profit=0.05, stop_loss=0.05,
                           max_hold=300, now=_ts(400), spread_floor=0.01, size=1.0)
-    assert abs(r["pnl"] - (-0.01)) < 1e-9  # pays the floored 1c round-trip
+    assert abs(r["pnl"] - (-0.01)) < 1e-9  # tick at 0.50 == 0.01; pays the 1c round-trip
+
+
+def test_lowprice_counterfactual_loss_bounded():
+    # The same Elon-style longshot, replayed as a counterfactual: the flat 0.01 floor
+    # would teach the brain a phantom 16×-stake loss. With the tick floor (0.001) and
+    # the stake cap, the loss is realistic — so the brain learns from honest numbers.
+    series = [(_ts(60), 0.0015, 0.0), (_ts(360), 0.0015, 0.0)]  # flat
+    r = settle_scalp_path(0.0015, True, series, BASE, take_profit=0.05, stop_loss=0.05,
+                          max_hold=300, now=_ts(400), spread_floor=0.01, size=1679.7)
+    assert r["status"] == "settled" and r["exit_reason"] == "time"
+    assert abs(r["pnl"] - (-1.68)) < 0.01           # size × tick(0.001), not × 0.01
+    assert r["pnl"] >= -1679.7 * 0.0015 - 1e-9       # never worse than the stake

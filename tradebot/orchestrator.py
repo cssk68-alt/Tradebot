@@ -15,12 +15,13 @@ from tradebot.brain.counterfactual import settle_scalp_path
 from tradebot.brain.feedback import Brain
 from tradebot.brain.hold_analysis import recommend_max_hold, scalp_hold_seconds
 from tradebot.data.gamma import DataUnavailableError, GammaClient
+from tradebot.exchange.execution_style import resolve_maker_fill
 from tradebot.exchange.paper import PaperExchange
 from tradebot.exchange.polymarket import PolymarketExchange
 from tradebot.llm import LLMUnavailableError, make_client
 from tradebot.ml.bootstrap import predictor_training_data
 from tradebot.ml.model import Predictor
-from tradebot.models import Counterfactual, Experience, Mode
+from tradebot.models import Counterfactual, Experience, Mode, ResolutionStatus
 from tradebot.risk.circuit_breaker import circuit_breaker_reason
 from tradebot.store.db import Store
 
@@ -243,6 +244,71 @@ class Orchestrator:
             return "stop"
         return None
 
+    def resolve_pending_makers(self, markets=None) -> None:
+        """Decide resting PAPER maker orders against the REAL price path (Teil B.3).
+
+        A maker BUY was rested one tick inside last cycle (``PaperExchange.place_order``
+        → status ``pending_maker``). Here we confirm it honestly — never on faith:
+
+          * **filled**  — the real observed side price traded down to the limit within
+            ``maker_timeout_seconds`` → open at the better limit price; the scalp clock
+            starts at the fill time (so max-hold counts from the real fill, not posting).
+          * **missed**  — the window passed without the price reaching the bid → take at
+            the CURRENT price (the live taker fallback, mirrored honestly in paper).
+          * **pending** — window still open → wait for the next cycle's ticks.
+
+        Stale leftovers (e.g. resolved long after a paused loop, or the market vanished)
+        are cancelled, not turned into a stale taker fill. Live is untouched — its fills
+        are confirmed by the real CLOB inside ``place_order``."""
+        pend = self.store.pending_maker_trades(self.mode)
+        if not pend:
+            return
+        by_id = {m.id: m for m in (markets or [])}
+        now = datetime.now(timezone.utc)
+        timeout = float(getattr(self.settings, "maker_timeout_seconds", 60.0))
+        opened, missed, canceled = 0, 0, 0
+        for t in pend:
+            posted = t.opened_at if t.opened_at.tzinfo else t.opened_at.replace(tzinfo=timezone.utc)
+            deadline = posted + timedelta(seconds=timeout)
+            m = by_id.get(t.market_id)
+            series = self.store.snapshots_between(t.market_id, posted, now)
+            if m is not None:  # freshest data point = the current live price
+                series = series + [(now, m.yes_price, m.spread)]
+            res = resolve_maker_fill(t.entry_price, t.is_yes, series, posted, deadline, now)
+            if res["status"] == "pending":
+                continue
+            if res["status"] == "filled":
+                t.status, t.exec_style = "open", "maker"
+                t.opened_at = res["fill_ts"]
+                self.store.open_pending_trade(t)
+                opened += 1
+                continue
+            # missed — take at the current price, unless it's stale or the market is gone.
+            stale = (now - deadline).total_seconds() > timeout
+            if m is None or stale:
+                self._cancel_pending_maker(t)
+                canceled += 1
+                continue
+            t.status, t.exec_style = "open", "taker"
+            t.entry_price = round(m.yes_price if t.is_yes else 1.0 - m.yes_price, 6)
+            t.opened_at = now
+            self.store.open_pending_trade(t)
+            missed += 1
+        if opened or missed or canceled:
+            self.log.info(
+                "Maker-Gebote aufgelöst: %d gefüllt (Tick gespart), %d verpasst→Taker, %d storniert",
+                opened, missed, canceled,
+            )
+
+    def _cancel_pending_maker(self, t) -> None:
+        """A resting maker that never filled and is stale / lost its market: cancel it.
+        Terminal status ``canceled`` keeps it out of open/resolved/exposure and out of
+        the brain's training data (it was a non-event, neither win nor loss)."""
+        t.status, t.kind, t.pnl, t.won = "canceled", "scalp", 0.0, None
+        t.resolved_at = datetime.now(timezone.utc)
+        self.store.update_trade(t)
+        self.log.info("Paper Maker storniert (kein Fill): '%s'", t.question[:50])
+
     def manage_open(self, markets=None, wind_down_deadline: Optional[float] = None):
         """Close/settle open trades against FRESH prices.
 
@@ -260,20 +326,14 @@ class Orchestrator:
             if self.settings.strategy == "scalp" or wind_down_deadline is not None:
                 m = by_id.get(t.market_id)
                 if m is None:
-                    if wind_down_deadline is not None:
-                        # Kein Live-Preis während Wind-down: Fehler loggen, Trade bleibt offen.
-                        # Im Dashboard erscheint er als stuck-Trade (gelbe Warnung).
-                        self.log.error(
-                            "WIND-DOWN FEHLER: kein Live-Preis fuer '%s' (market_id=%s) — "
-                            "Trade kann nicht automatisch geschlossen werden. "
-                            "Bitte auf Polymarket manuell pruefen.",
-                            t.question[:70], t.market_id,
-                        )
-                    continue  # kein Preis -> ueberspringen, egal ob Stop oder nicht
-                reason = self._scalp_trigger(t, m, wind_down_deadline=wind_down_deadline)
-                if reason is None:
-                    continue
-                r = self.exchange.close(t, m, reason=reason)
+                    # Markt fehlt in der Bulk-Liste (aufgelöst, in Settling, oder unter
+                    # dem Liquiditätsfilter). NICHT still überspringen — sonst bleibt der
+                    # Trade ewig offen. Stattdessen aktiv beschaffen, was zum Schließen
+                    # nötig ist (echte Resolution oder direkter Einzel-Preisabruf).
+                    r = self._close_missing(t, wind_down_deadline)
+                else:
+                    reason = self._scalp_trigger(t, m, wind_down_deadline=wind_down_deadline)
+                    r = self.exchange.close(t, m, reason=reason) if reason else None
             else:
                 r = self.exchange.settle(t)
             if r is not None:
@@ -281,6 +341,68 @@ class Orchestrator:
                 resolved.append(r)
         self._after_resolved(resolved, "Closed")
         return resolved
+
+    def _close_missing(self, t, wind_down_deadline: Optional[float] = None):
+        """Schließe einen Trade, dessen Markt NICHT in der Bulk-Liste ist.
+
+        Ein offener Trade darf nie still hängenbleiben — der Code holt sich aktiv, was
+        er zum Schließen braucht, über Direktabrufe der einzelnen Markt-Endpoints
+        (die auch funktionieren, wenn der Markt aus ``list_markets()`` gefallen ist):
+
+          1. **Echte Resolution** (``/markets/{id}``): Markt aufgelöst (z.B. UFC-Kampf
+             vorbei → Settling → entschieden) → real setteln mit dem echten Ergebnis.
+          2. **Noch offen, nur aus der Liste gefallen** (Liquiditätsfilter / temporär
+             inaktiv): Einzel-Preisabruf → frischer Live-Preis → normaler Scalp-Trigger.
+             max_hold garantiert, dass der Trade spätestens nach ``max_hold_seconds``
+             schließt; ein junger Trade bei transientem Drop-out bleibt offen und wird
+             nächsten Zyklus erneut geprüft (kein verfrühtes Rauswerfen).
+          3. **Weder Resolution noch Preis** (echtes Settling-Limbo / API-Fehler): laut
+             loggen statt still schlucken; Trade bleibt offen und der nächste Zyklus
+             versucht es erneut. Erst hier ist die Stuck-Warnung im Dashboard berechtigt.
+
+        Gibt den geschlossenen/gesetelten Trade zurück, sonst None (bleibt offen)."""
+        res = self.gamma.get_resolution(t.market_id)
+        if res.status != ResolutionStatus.OPEN:
+            # Aufgelöst / void / ambiguous / error — über den echten Settlement-Pfad
+            # (AMBIGUOUS und ERROR geben None zurück → bleiben für manuelle Prüfung offen).
+            r = self.exchange.settle(t, resolution=res)
+            if r is not None:
+                self.log.info(
+                    "Markt nicht in Liste, aber aufgelöst — '%s' real gesettelt (pnl %+.2f).",
+                    t.question[:60], r.pnl,
+                )
+            else:
+                self.log.error(
+                    "Trade '%s' (market_id=%s) nicht automatisch schließbar: Resolution=%s (%s). "
+                    "Bleibt offen — bitte auf Polymarket prüfen.",
+                    t.question[:60], t.market_id, res.status.value, res.reason or "—",
+                )
+            return r
+
+        # Markt noch OPEN, aber aus der Bulk-Liste gefallen → frischen Preis direkt holen.
+        m = self.gamma.fetch_market(t.market_id)
+        if m is None:
+            self.log.error(
+                "Trade '%s' (market_id=%s) nicht automatisch schließbar: Markt offen, aber "
+                "kein Live-Preis verfügbar. Bleibt offen — bitte auf Polymarket prüfen.",
+                t.question[:60], t.market_id,
+            )
+            return None
+        reason = self._scalp_trigger(t, m, wind_down_deadline=wind_down_deadline)
+        if reason is None:
+            return None  # kein Exit-Grund (junger Trade / transienter Drop-out) → nächster Zyklus
+        r = self.exchange.close(t, m, reason=reason)
+        if r is None:
+            self.log.error(
+                "Trade '%s' (market_id=%s): SELL zum Schließen nicht angenommen — bleibt offen.",
+                t.question[:60], t.market_id,
+            )
+        else:
+            self.log.info(
+                "Markt '%s' per Einzelabruf geschlossen (%s, pnl %+.2f).",
+                t.question[:60], reason, r.pnl,
+            )
+        return r
 
     # --- main cycle ---
     def run_once(self):
@@ -295,6 +417,10 @@ class Orchestrator:
             # must never run on synthetic/fallback data.
             self.log.error("HARD-FAIL: aborting cycle — %s", e)
             raise
+        # Confirm/deny resting paper maker orders against the real price path BEFORE
+        # managing open trades, so a maker filled this cycle becomes a normal open
+        # position right away.
+        self.resolve_pending_makers(markets)
         self.manage_open(markets)
         # Settle any counterfactuals whose scalp window has elapsed (Problem 1):
         # learns from vetoed/mirror setups via the real snapshot price path.

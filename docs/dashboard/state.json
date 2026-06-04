@@ -1,1 +1,1381 @@
-{}
+{
+  "generated_at": "2026-06-04T19:19:15.092802+00:00",
+  "mode": "paper",
+  "starting_bankroll": 1000.0,
+  "bankroll": 901.69,
+  "realized_pnl": -98.31,
+  "n_trades": 82,
+  "n_wins": 10,
+  "n_losses": 72,
+  "win_rate": 0.122,
+  "n_open": 0,
+  "n_pending_maker": 0,
+  "open_trades": [],
+  "resolved_trades": [
+    {
+      "question": "Will Alexander Zverev win the 2026 Men's French Open?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.386,
+      "exit": 0.386,
+      "size": 8.4,
+      "edge": 0.151,
+      "brain": 0.5,
+      "pnl": -0.08,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T15:59:07.007550+00:00",
+      "resolved_at": "2026-06-04T16:09:46.632112+00:00"
+    },
+    {
+      "question": "Iran leadership change by June 30?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.966,
+      "exit": 0.962,
+      "size": 3.4,
+      "edge": 0.024,
+      "brain": 0.5,
+      "pnl": -0.05,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T15:59:07.016315+00:00",
+      "resolved_at": "2026-06-04T16:09:46.637355+00:00"
+    },
+    {
+      "question": "Baltimore Orioles vs. Boston Red Sox",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.8,
+      "edge": 0.062,
+      "brain": 0.5,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.815968+00:00",
+      "resolved_at": "2026-06-04T16:11:33.722410+00:00"
+    },
+    {
+      "question": "Will the New York Knicks win the 2026 NBA Finals?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.466,
+      "exit": 0.466,
+      "size": 7.0,
+      "edge": 0.17,
+      "brain": 0.5,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.822779+00:00",
+      "resolved_at": "2026-06-04T16:11:33.733709+00:00"
+    },
+    {
+      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.534,
+      "exit": 0.534,
+      "size": 6.1,
+      "edge": 0.099,
+      "brain": 0.5,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.831569+00:00",
+      "resolved_at": "2026-06-04T16:11:33.739638+00:00"
+    },
+    {
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.545,
+      "exit": 0.54,
+      "size": 6.0,
+      "edge": 0.124,
+      "brain": 0.5,
+      "pnl": -0.15,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.839309+00:00",
+      "resolved_at": "2026-06-04T16:11:33.745329+00:00"
+    },
+    {
+      "question": "Los Angeles Dodgers vs. Arizona Diamondbacks",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 5.9,
+      "edge": 0.129,
+      "brain": 0.5,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.854936+00:00",
+      "resolved_at": "2026-06-04T16:11:33.750392+00:00"
+    },
+    {
+      "question": "Will the Vegas Golden Knights win the 2026 NHL Stanley Cup?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.586,
+      "exit": 0.585,
+      "size": 5.5,
+      "edge": 0.083,
+      "brain": 0.5,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.863393+00:00",
+      "resolved_at": "2026-06-04T16:11:33.755796+00:00"
+    },
+    {
+      "question": "Cleveland Guardians vs. New York Yankees",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.395,
+      "exit": 0.395,
+      "size": 8.2,
+      "edge": 0.052,
+      "brain": 0.5,
+      "pnl": -0.08,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.869490+00:00",
+      "resolved_at": "2026-06-04T16:11:33.761509+00:00"
+    },
+    {
+      "question": "Will Alexander Zverev win the 2026 Men's French Open?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.614,
+      "exit": 0.614,
+      "size": 5.3,
+      "edge": 0.175,
+      "brain": 0.5,
+      "pnl": -0.05,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:00:59.877618+00:00",
+      "resolved_at": "2026-06-04T16:11:33.766335+00:00"
+    },
+    {
+      "question": "Prostejov: Taro Daniel vs Damir Dzumhur",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.445,
+      "exit": 0.66,
+      "size": 7.3,
+      "edge": 0.03,
+      "brain": 0.999,
+      "pnl": 1.28,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.248960+00:00",
+      "resolved_at": "2026-06-04T16:11:33.772477+00:00"
+    },
+    {
+      "question": "Prostejov: Taro Daniel vs Damir Dzumhur",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.445,
+      "exit": 0.66,
+      "size": 7.3,
+      "edge": 0.042,
+      "brain": 0.916,
+      "pnl": 1.28,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.136573+00:00",
+      "resolved_at": "2026-06-04T16:11:33.778519+00:00"
+    },
+    {
+      "question": "Prostejov: Taro Daniel vs Damir Dzumhur",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.445,
+      "exit": 0.66,
+      "size": 6.7,
+      "edge": 0.036,
+      "brain": 0.998,
+      "pnl": 1.17,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:11:22.699331+00:00",
+      "resolved_at": "2026-06-04T16:11:33.784268+00:00"
+    },
+    {
+      "question": "Roland Garros WTA: Diana Shnaider vs Maja Chwalinska",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.605,
+      "size": 5.4,
+      "edge": 0.035,
+      "brain": 0.894,
+      "pnl": 0.22,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:11:22.706522+00:00",
+      "resolved_at": "2026-06-04T16:11:33.788377+00:00"
+    },
+    {
+      "question": "US-Iran nuclear deal by June 30?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.695,
+      "exit": 0.695,
+      "size": 4.7,
+      "edge": 0.065,
+      "brain": 0.996,
+      "pnl": -0.05,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.258328+00:00",
+      "resolved_at": "2026-06-04T16:13:22.252272+00:00"
+    },
+    {
+      "question": "Baltimore Orioles vs. Boston Red Sox",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.9,
+      "edge": 0.115,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.266519+00:00",
+      "resolved_at": "2026-06-04T16:13:22.263499+00:00"
+    },
+    {
+      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.466,
+      "exit": 0.466,
+      "size": 7.0,
+      "edge": 0.111,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.274860+00:00",
+      "resolved_at": "2026-06-04T16:13:22.270134+00:00"
+    },
+    {
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.455,
+      "exit": 0.46,
+      "size": 7.2,
+      "edge": 0.026,
+      "brain": 0.999,
+      "pnl": -0.11,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.283274+00:00",
+      "resolved_at": "2026-06-04T16:13:22.276107+00:00"
+    },
+    {
+      "question": "Los Angeles Dodgers vs. Arizona Diamondbacks",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 5.9,
+      "edge": 0.139,
+      "brain": 1.0,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.298336+00:00",
+      "resolved_at": "2026-06-04T16:13:22.281631+00:00"
+    },
+    {
+      "question": "US announces new Iran agreement/ceasefire extension by June 30?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.435,
+      "exit": 0.435,
+      "size": 7.5,
+      "edge": 0.024,
+      "brain": 0.978,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.305393+00:00",
+      "resolved_at": "2026-06-04T16:13:22.288075+00:00"
+    },
+    {
+      "question": "Will the Carolina Hurricanes win the 2026 NHL Stanley Cup?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.415,
+      "exit": 0.415,
+      "size": 7.8,
+      "edge": 0.049,
+      "brain": 1.0,
+      "pnl": -0.08,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:02:48.313419+00:00",
+      "resolved_at": "2026-06-04T16:13:22.293494+00:00"
+    },
+    {
+      "question": "Will Bitcoin dip to $55,000 in June?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.783,
+      "exit": 0.788,
+      "size": 4.1,
+      "edge": 0.106,
+      "brain": 1.0,
+      "pnl": -0.02,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.252876+00:00",
+      "resolved_at": "2026-06-04T16:15:10.951354+00:00"
+    },
+    {
+      "question": "Will Bitcoin dip to $50,000 in June?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.913,
+      "exit": 0.911,
+      "size": 3.6,
+      "edge": 0.027,
+      "brain": 0.771,
+      "pnl": -0.04,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.262695+00:00",
+      "resolved_at": "2026-06-04T16:15:10.957865+00:00"
+    },
+    {
+      "question": "Iran closes its airspace by June 15?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.91,
+      "exit": 0.918,
+      "size": 3.6,
+      "edge": 0.029,
+      "brain": 0.798,
+      "pnl": -0.01,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.271004+00:00",
+      "resolved_at": "2026-06-04T16:15:10.962630+00:00"
+    },
+    {
+      "question": "Will Roberto S\u00e1nchez Palomino win the 2026 Peruvian presidential election?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.761,
+      "exit": 0.761,
+      "size": 4.3,
+      "edge": 0.038,
+      "brain": 0.987,
+      "pnl": -0.04,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.279229+00:00",
+      "resolved_at": "2026-06-04T16:15:10.967685+00:00"
+    },
+    {
+      "question": "Baltimore Orioles vs. Boston Red Sox",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.8,
+      "edge": 0.115,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.285077+00:00",
+      "resolved_at": "2026-06-04T16:15:10.973044+00:00"
+    },
+    {
+      "question": "Will the New York Knicks win the 2026 NBA Finals?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.534,
+      "exit": 0.534,
+      "size": 6.1,
+      "edge": 0.045,
+      "brain": 1.0,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.292243+00:00",
+      "resolved_at": "2026-06-04T16:15:10.978781+00:00"
+    },
+    {
+      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.466,
+      "exit": 0.466,
+      "size": 7.0,
+      "edge": 0.09,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:04:22.297532+00:00",
+      "resolved_at": "2026-06-04T16:15:10.984948+00:00"
+    },
+    {
+      "question": "Baltimore Orioles vs. Boston Red Sox",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.8,
+      "edge": 0.115,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.096094+00:00",
+      "resolved_at": "2026-06-04T16:17:10.728411+00:00"
+    },
+    {
+      "question": "Will the New York Knicks win the 2026 NBA Finals?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.466,
+      "exit": 0.465,
+      "size": 7.0,
+      "edge": 0.023,
+      "brain": 0.994,
+      "pnl": -0.08,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.104802+00:00",
+      "resolved_at": "2026-06-04T16:17:10.741052+00:00"
+    },
+    {
+      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.466,
+      "exit": 0.466,
+      "size": 7.0,
+      "edge": 0.113,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.114210+00:00",
+      "resolved_at": "2026-06-04T16:17:10.746124+00:00"
+    },
+    {
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.455,
+      "exit": 0.475,
+      "size": 7.1,
+      "edge": 0.026,
+      "brain": 0.976,
+      "pnl": 0.07,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.121609+00:00",
+      "resolved_at": "2026-06-04T16:17:10.750363+00:00"
+    },
+    {
+      "question": "Los Angeles Dodgers vs. Arizona Diamondbacks",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 5.8,
+      "edge": 0.139,
+      "brain": 1.0,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.143000+00:00",
+      "resolved_at": "2026-06-04T16:17:10.755068+00:00"
+    },
+    {
+      "question": "US announces new Iran agreement/ceasefire extension by June 30?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.435,
+      "exit": 0.435,
+      "size": 7.5,
+      "edge": 0.098,
+      "brain": 1.0,
+      "pnl": -0.07,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.149116+00:00",
+      "resolved_at": "2026-06-04T16:17:10.758707+00:00"
+    },
+    {
+      "question": "Cleveland Guardians vs. New York Yankees",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.395,
+      "exit": 0.395,
+      "size": 8.2,
+      "edge": 0.037,
+      "brain": 0.992,
+      "pnl": -0.08,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:05:58.155010+00:00",
+      "resolved_at": "2026-06-04T16:17:10.764108+00:00"
+    },
+    {
+      "question": "Will Bitcoin reach $70,000 in June?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.645,
+      "exit": 0.645,
+      "size": 4.7,
+      "edge": 0.112,
+      "brain": 1.0,
+      "pnl": -0.05,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:07:42.746842+00:00",
+      "resolved_at": "2026-06-04T16:19:04.038853+00:00"
+    },
+    {
+      "question": "Baltimore Orioles vs. Boston Red Sox",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.3,
+      "edge": 0.075,
+      "brain": 0.972,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:07:42.753737+00:00",
+      "resolved_at": "2026-06-04T16:19:04.044344+00:00"
+    },
+    {
+      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.466,
+      "exit": 0.466,
+      "size": 6.5,
+      "edge": 0.083,
+      "brain": 0.187,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:07:42.764139+00:00",
+      "resolved_at": "2026-06-04T16:19:04.049950+00:00"
+    },
+    {
+      "question": "Will Elon Musk post 260-279 tweets from May 29 to June 5, 2026?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.002,
+      "exit": 0.002,
+      "size": 1679.7,
+      "edge": 0.028,
+      "brain": 0.854,
+      "pnl": -16.8,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:14:59.824856+00:00",
+      "resolved_at": "2026-06-04T16:26:29.443102+00:00"
+    },
+    {
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.3,
+      "edge": 0.041,
+      "brain": 0.921,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:18:52.454973+00:00",
+      "resolved_at": "2026-06-04T16:29:36.849672+00:00"
+    },
+    {
+      "question": "UFC Fight Night: Bruno Silva vs. \u00c9dgar Ch\u00e1irez (Flyweight, Prelims)",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.535,
+      "exit": 0.535,
+      "size": 5.6,
+      "edge": 0.03,
+      "brain": 1.0,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:20:47.134440+00:00",
+      "resolved_at": "2026-06-04T16:31:19.881829+00:00"
+    },
+    {
+      "question": "Roland Garros WTA: Diana Shnaider vs Maja Chwalinska",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.675,
+      "exit": 0.315,
+      "size": 4.4,
+      "edge": 0.025,
+      "brain": 0.989,
+      "pnl": -1.64,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:22:22.481283+00:00",
+      "resolved_at": "2026-06-04T16:31:19.886668+00:00"
+    },
+    {
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.3,
+      "edge": 0.041,
+      "brain": 0.978,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:22:22.492390+00:00",
+      "resolved_at": "2026-06-04T16:33:11.250512+00:00"
+    },
+    {
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.475,
+      "exit": 0.475,
+      "size": 6.3,
+      "edge": 0.041,
+      "brain": 0.978,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:24:05.307388+00:00",
+      "resolved_at": "2026-06-04T16:34:58.818983+00:00"
+    },
+    {
+      "question": "UFC Fight Night: Bruno Silva vs. \u00c9dgar Ch\u00e1irez (Flyweight, Prelims)",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.535,
+      "exit": 0.535,
+      "size": 5.6,
+      "edge": 0.03,
+      "brain": 1.0,
+      "pnl": -0.06,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:24:05.327226+00:00",
+      "resolved_at": "2026-06-04T16:34:58.829380+00:00"
+    },
+    {
+      "question": "Will Bitcoin reach $70,000 in June?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "maker",
+      "entry": 0.655,
+      "exit": 0.655,
+      "size": 4.5,
+      "edge": 0.106,
+      "brain": 0.033,
+      "pnl": -0.04,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:27:57.926001+00:00",
+      "resolved_at": "2026-06-04T16:38:02.943735+00:00"
+    },
+    {
+      "question": "UFC Fight Night: Bruno Silva vs. \u00c9dgar Ch\u00e1irez (Flyweight, Prelims)",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.535,
+      "exit": 0.535,
+      "size": 5.5,
+      "edge": 0.033,
+      "brain": 1.0,
+      "pnl": -0.05,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:27:57.944196+00:00",
+      "resolved_at": "2026-06-04T16:38:02.954346+00:00"
+    },
+    {
+      "question": "UFC Fight Night: Bruno Silva vs. \u00c9dgar Ch\u00e1irez (Flyweight, Prelims)",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.535,
+      "exit": 0.535,
+      "size": 5.5,
+      "edge": 0.04,
+      "brain": 1.0,
+      "pnl": -0.05,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:31:08.165943+00:00",
+      "resolved_at": "2026-06-04T16:41:18.497546+00:00"
+    },
+    {
+      "question": "Roland Garros WTA: Diana Shnaider vs Maja Chwalinska",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.315,
+      "exit": 0.315,
+      "size": 9.3,
+      "edge": 0.055,
+      "brain": 0.98,
+      "pnl": -0.09,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:32:59.915067+00:00",
+      "resolved_at": "2026-06-04T16:43:05.426227+00:00"
+    },
+    {
+      "question": "Will Meta Platforms, Inc. (META) hit (LOW) $500 in June?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.952,
+      "exit": 0.959,
+      "size": 3.1,
+      "edge": 0.033,
+      "brain": 0.999,
+      "pnl": -0.01,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T16:34:47.023336+00:00",
+      "resolved_at": "2026-06-04T16:44:53.324818+00:00"
+    }
+  ],
+  "equity_curve": [
+    {
+      "t": "2026-06-04T15:56:17.627997+00:00",
+      "pnl": 0.1,
+      "cum": 1000.1
+    },
+    {
+      "t": "2026-06-04T16:01:10.303821+00:00",
+      "pnl": 0.97,
+      "cum": 1001.07
+    },
+    {
+      "t": "2026-06-04T16:01:10.314603+00:00",
+      "pnl": 0.4,
+      "cum": 1001.48
+    },
+    {
+      "t": "2026-06-04T16:01:10.320290+00:00",
+      "pnl": 0.4,
+      "cum": 1001.88
+    },
+    {
+      "t": "2026-06-04T16:01:10.325582+00:00",
+      "pnl": 0.4,
+      "cum": 1002.28
+    },
+    {
+      "t": "2026-06-04T16:02:58.714530+00:00",
+      "pnl": -3.35,
+      "cum": 998.93
+    },
+    {
+      "t": "2026-06-04T16:06:09.834012+00:00",
+      "pnl": -0.4,
+      "cum": 998.53
+    },
+    {
+      "t": "2026-06-04T16:06:09.844499+00:00",
+      "pnl": -9.43,
+      "cum": 989.1
+    },
+    {
+      "t": "2026-06-04T16:06:09.851611+00:00",
+      "pnl": -65.0,
+      "cum": 924.1
+    },
+    {
+      "t": "2026-06-04T16:06:09.855466+00:00",
+      "pnl": -0.05,
+      "cum": 924.06
+    },
+    {
+      "t": "2026-06-04T16:06:09.860788+00:00",
+      "pnl": -0.08,
+      "cum": 923.97
+    },
+    {
+      "t": "2026-06-04T16:07:53.323739+00:00",
+      "pnl": -0.1,
+      "cum": 923.87
+    },
+    {
+      "t": "2026-06-04T16:07:53.328965+00:00",
+      "pnl": -0.06,
+      "cum": 923.81
+    },
+    {
+      "t": "2026-06-04T16:07:53.333786+00:00",
+      "pnl": -0.04,
+      "cum": 923.77
+    },
+    {
+      "t": "2026-06-04T16:07:53.338640+00:00",
+      "pnl": 0.0,
+      "cum": 923.77
+    },
+    {
+      "t": "2026-06-04T16:07:53.344839+00:00",
+      "pnl": -0.03,
+      "cum": 923.74
+    },
+    {
+      "t": "2026-06-04T16:07:53.351301+00:00",
+      "pnl": -0.07,
+      "cum": 923.67
+    },
+    {
+      "t": "2026-06-04T16:07:53.356458+00:00",
+      "pnl": -0.07,
+      "cum": 923.6
+    },
+    {
+      "t": "2026-06-04T16:07:53.363086+00:00",
+      "pnl": -0.06,
+      "cum": 923.54
+    },
+    {
+      "t": "2026-06-04T16:07:53.368307+00:00",
+      "pnl": -0.07,
+      "cum": 923.47
+    },
+    {
+      "t": "2026-06-04T16:07:53.374336+00:00",
+      "pnl": -0.23,
+      "cum": 923.24
+    },
+    {
+      "t": "2026-06-04T16:07:53.379904+00:00",
+      "pnl": -0.08,
+      "cum": 923.16
+    },
+    {
+      "t": "2026-06-04T16:07:53.384239+00:00",
+      "pnl": -0.34,
+      "cum": 922.83
+    },
+    {
+      "t": "2026-06-04T16:07:53.390502+00:00",
+      "pnl": -2.38,
+      "cum": 920.44
+    },
+    {
+      "t": "2026-06-04T16:07:53.396126+00:00",
+      "pnl": -0.34,
+      "cum": 920.11
+    },
+    {
+      "t": "2026-06-04T16:07:53.402393+00:00",
+      "pnl": -0.34,
+      "cum": 919.77
+    },
+    {
+      "t": "2026-06-04T16:07:53.407670+00:00",
+      "pnl": -0.34,
+      "cum": 919.44
+    },
+    {
+      "t": "2026-06-04T16:07:53.412607+00:00",
+      "pnl": -0.31,
+      "cum": 919.13
+    },
+    {
+      "t": "2026-06-04T16:09:46.606660+00:00",
+      "pnl": -0.07,
+      "cum": 919.06
+    },
+    {
+      "t": "2026-06-04T16:09:46.613022+00:00",
+      "pnl": -0.15,
+      "cum": 918.91
+    },
+    {
+      "t": "2026-06-04T16:09:46.619698+00:00",
+      "pnl": -0.04,
+      "cum": 918.86
+    },
+    {
+      "t": "2026-06-04T16:09:46.625432+00:00",
+      "pnl": -0.04,
+      "cum": 918.82
+    },
+    {
+      "t": "2026-06-04T16:09:46.632112+00:00",
+      "pnl": -0.08,
+      "cum": 918.74
+    },
+    {
+      "t": "2026-06-04T16:09:46.637355+00:00",
+      "pnl": -0.05,
+      "cum": 918.69
+    },
+    {
+      "t": "2026-06-04T16:11:33.722410+00:00",
+      "pnl": -0.07,
+      "cum": 918.62
+    },
+    {
+      "t": "2026-06-04T16:11:33.733709+00:00",
+      "pnl": -0.07,
+      "cum": 918.55
+    },
+    {
+      "t": "2026-06-04T16:11:33.739638+00:00",
+      "pnl": -0.06,
+      "cum": 918.49
+    },
+    {
+      "t": "2026-06-04T16:11:33.745329+00:00",
+      "pnl": -0.15,
+      "cum": 918.34
+    },
+    {
+      "t": "2026-06-04T16:11:33.750392+00:00",
+      "pnl": -0.06,
+      "cum": 918.28
+    },
+    {
+      "t": "2026-06-04T16:11:33.755796+00:00",
+      "pnl": -0.06,
+      "cum": 918.22
+    },
+    {
+      "t": "2026-06-04T16:11:33.761509+00:00",
+      "pnl": -0.08,
+      "cum": 918.14
+    },
+    {
+      "t": "2026-06-04T16:11:33.766335+00:00",
+      "pnl": -0.05,
+      "cum": 918.08
+    },
+    {
+      "t": "2026-06-04T16:11:33.772477+00:00",
+      "pnl": 1.28,
+      "cum": 919.36
+    },
+    {
+      "t": "2026-06-04T16:11:33.778519+00:00",
+      "pnl": 1.28,
+      "cum": 920.64
+    },
+    {
+      "t": "2026-06-04T16:11:33.784268+00:00",
+      "pnl": 1.17,
+      "cum": 921.82
+    },
+    {
+      "t": "2026-06-04T16:11:33.788377+00:00",
+      "pnl": 0.22,
+      "cum": 922.03
+    },
+    {
+      "t": "2026-06-04T16:13:22.252272+00:00",
+      "pnl": -0.05,
+      "cum": 921.98
+    },
+    {
+      "t": "2026-06-04T16:13:22.263499+00:00",
+      "pnl": -0.07,
+      "cum": 921.92
+    },
+    {
+      "t": "2026-06-04T16:13:22.270134+00:00",
+      "pnl": -0.07,
+      "cum": 921.85
+    },
+    {
+      "t": "2026-06-04T16:13:22.276107+00:00",
+      "pnl": -0.11,
+      "cum": 921.74
+    },
+    {
+      "t": "2026-06-04T16:13:22.281631+00:00",
+      "pnl": -0.06,
+      "cum": 921.68
+    },
+    {
+      "t": "2026-06-04T16:13:22.288075+00:00",
+      "pnl": -0.07,
+      "cum": 921.6
+    },
+    {
+      "t": "2026-06-04T16:13:22.293494+00:00",
+      "pnl": -0.08,
+      "cum": 921.53
+    },
+    {
+      "t": "2026-06-04T16:15:10.951354+00:00",
+      "pnl": -0.02,
+      "cum": 921.5
+    },
+    {
+      "t": "2026-06-04T16:15:10.957865+00:00",
+      "pnl": -0.04,
+      "cum": 921.46
+    },
+    {
+      "t": "2026-06-04T16:15:10.962630+00:00",
+      "pnl": -0.01,
+      "cum": 921.46
+    },
+    {
+      "t": "2026-06-04T16:15:10.967685+00:00",
+      "pnl": -0.04,
+      "cum": 921.41
+    },
+    {
+      "t": "2026-06-04T16:15:10.973044+00:00",
+      "pnl": -0.07,
+      "cum": 921.34
+    },
+    {
+      "t": "2026-06-04T16:15:10.978781+00:00",
+      "pnl": -0.06,
+      "cum": 921.28
+    },
+    {
+      "t": "2026-06-04T16:15:10.984948+00:00",
+      "pnl": -0.07,
+      "cum": 921.21
+    },
+    {
+      "t": "2026-06-04T16:17:10.728411+00:00",
+      "pnl": -0.07,
+      "cum": 921.15
+    },
+    {
+      "t": "2026-06-04T16:17:10.741052+00:00",
+      "pnl": -0.08,
+      "cum": 921.07
+    },
+    {
+      "t": "2026-06-04T16:17:10.746124+00:00",
+      "pnl": -0.07,
+      "cum": 921.0
+    },
+    {
+      "t": "2026-06-04T16:17:10.750363+00:00",
+      "pnl": 0.07,
+      "cum": 921.07
+    },
+    {
+      "t": "2026-06-04T16:17:10.755068+00:00",
+      "pnl": -0.06,
+      "cum": 921.01
+    },
+    {
+      "t": "2026-06-04T16:17:10.758707+00:00",
+      "pnl": -0.07,
+      "cum": 920.94
+    },
+    {
+      "t": "2026-06-04T16:17:10.764108+00:00",
+      "pnl": -0.08,
+      "cum": 920.85
+    },
+    {
+      "t": "2026-06-04T16:19:04.038853+00:00",
+      "pnl": -0.05,
+      "cum": 920.81
+    },
+    {
+      "t": "2026-06-04T16:19:04.044344+00:00",
+      "pnl": -0.06,
+      "cum": 920.74
+    },
+    {
+      "t": "2026-06-04T16:19:04.049950+00:00",
+      "pnl": -0.06,
+      "cum": 920.68
+    },
+    {
+      "t": "2026-06-04T16:26:29.443102+00:00",
+      "pnl": -16.8,
+      "cum": 903.88
+    },
+    {
+      "t": "2026-06-04T16:29:36.849672+00:00",
+      "pnl": -0.06,
+      "cum": 903.82
+    },
+    {
+      "t": "2026-06-04T16:31:19.881829+00:00",
+      "pnl": -0.06,
+      "cum": 903.76
+    },
+    {
+      "t": "2026-06-04T16:31:19.886668+00:00",
+      "pnl": -1.64,
+      "cum": 902.12
+    },
+    {
+      "t": "2026-06-04T16:33:11.250512+00:00",
+      "pnl": -0.06,
+      "cum": 902.06
+    },
+    {
+      "t": "2026-06-04T16:34:58.818983+00:00",
+      "pnl": -0.06,
+      "cum": 902.0
+    },
+    {
+      "t": "2026-06-04T16:34:58.829380+00:00",
+      "pnl": -0.06,
+      "cum": 901.94
+    },
+    {
+      "t": "2026-06-04T16:38:02.943735+00:00",
+      "pnl": -0.04,
+      "cum": 901.9
+    },
+    {
+      "t": "2026-06-04T16:38:02.954346+00:00",
+      "pnl": -0.05,
+      "cum": 901.84
+    },
+    {
+      "t": "2026-06-04T16:41:18.497546+00:00",
+      "pnl": -0.05,
+      "cum": 901.79
+    },
+    {
+      "t": "2026-06-04T16:43:05.426227+00:00",
+      "pnl": -0.09,
+      "cum": 901.69
+    },
+    {
+      "t": "2026-06-04T16:44:53.324818+00:00",
+      "pnl": -0.01,
+      "cum": 901.69
+    }
+  ],
+  "brain": {
+    "trained": true,
+    "experiences": 105,
+    "wins": 22,
+    "losses": 83
+  },
+  "lessons": [
+    {
+      "category": "timing",
+      "cause": "Expiration risk too high for small edge",
+      "recommendation": "Avoid binary trades with <1 month to expiry unless edge >0.10"
+    },
+    {
+      "category": "timing",
+      "cause": "Entry too late after odds shifted",
+      "recommendation": "Set strict entry thresholds and avoid chasing after initial edge window closes"
+    },
+    {
+      "category": "timing",
+      "cause": "Entered too early before odds stabilized",
+      "recommendation": "Wait for market depth and late odds shifts before entry"
+    },
+    {
+      "category": "timing",
+      "cause": "Entered too early before odds stabilized",
+      "recommendation": "Wait for odds to settle closer to fight start to confirm edge"
+    },
+    {
+      "category": "timing",
+      "cause": "Entered too early before June started, losing edge to time decay",
+      "recommendation": "Wait until the month begins or use conditional entry near expiry to reduce theta risk"
+    },
+    {
+      "category": "timing",
+      "cause": "Entered too early before odds stabilized",
+      "recommendation": "Wait for market depth and late odds movement before entry"
+    },
+    {
+      "category": "timing",
+      "cause": "Overestimated probability of early resolution; market priced in lower chance of event occurring before deadline.",
+      "recommendation": "Incorporate time decay and event likelihood curves into edge calculation."
+    },
+    {
+      "category": "timing",
+      "cause": "Overestimated probability of near-term policy reversal despite low base rate",
+      "recommendation": "Apply stricter time decay adjustments for binary geopolitical events with long horizons"
+    },
+    {
+      "category": "timing",
+      "cause": "Entered too early before market stabilized",
+      "recommendation": "Wait for higher brain confirmation or tighter entry threshold"
+    },
+    {
+      "category": "timing",
+      "cause": "Entered too early before odds shifted against position",
+      "recommendation": "Wait for odds to stabilize closer to fight start to confirm edge"
+    },
+    {
+      "category": "timing",
+      "cause": "Overestimated probability of early resolution; market priced in lower chance of event occurring before deadline.",
+      "recommendation": "Reduce position size when edge is small and time to expiry is long; prioritize catalysts near resolution."
+    },
+    {
+      "category": "timing",
+      "cause": "Entered at 0.00 with no price movement buffer, edge too small to overcome adverse fills or late entry",
+      "recommendation": "Wait for price confirmation above 0.01 before entering, or increase edge threshold to 0.05 for zero-price entries"
+    }
+  ],
+  "hold_recommendation": {
+    "status": "ok",
+    "n": 82,
+    "n_won": 10,
+    "n_lost": 72,
+    "p50": 253.9,
+    "p75": 327.5,
+    "p95": 606.4,
+    "current": 315.0,
+    "recommended": 393.0,
+    "direction": "raise",
+    "message": "Gewinner brauchen oft laenger (P75 327s) als das aktuelle Limit (315s) \u2014 erwaege Erhoehung auf ~393s, sonst werden reifende Gewinner zu frueh geschlossen."
+  },
+  "brain_diagnostics": {
+    "oos": {
+      "status": "ok",
+      "n_train": 79,
+      "n_test": 26,
+      "accuracy": 0.6923,
+      "logloss": 2.6307,
+      "auc": 0.5208
+    },
+    "feature_importance": [
+      {
+        "name": "dist_from_half",
+        "importance": 1.0932
+      },
+      {
+        "name": "spread",
+        "importance": 0.9284
+      },
+      {
+        "name": "log_sources",
+        "importance": 0.7495
+      },
+      {
+        "name": "yes_price",
+        "importance": 0.5697
+      },
+      {
+        "name": "days_norm",
+        "importance": 0.4439
+      },
+      {
+        "name": "fav_flag",
+        "importance": 0.219
+      },
+      {
+        "name": "rss_log_sources",
+        "importance": 0.0216
+      },
+      {
+        "name": "fact_confidence",
+        "importance": 0.0043
+      }
+    ],
+    "counterfactuals": {
+      "pending": 135,
+      "settled": 23,
+      "brain_right": 1,
+      "brain_wrong": 1
+    },
+    "experiences": {
+      "real": 82,
+      "counterfactual": 23,
+      "total": 105
+    }
+  },
+  "circuit_breaker": {
+    "tripped": false,
+    "reason": "",
+    "realized_today": -98.31,
+    "consecutive_losses": 18
+  },
+  "config": {
+    "kelly_fraction": 0.3,
+    "edge_threshold": 0.05,
+    "confidence_threshold": 0.6,
+    "max_trade_pct": 0.2,
+    "brain_veto_threshold": 0.25,
+    "max_spread": 0.03,
+    "max_daily_loss_pct": 0.08,
+    "max_consecutive_losses": 8,
+    "max_hold_seconds": 315
+  }
+}

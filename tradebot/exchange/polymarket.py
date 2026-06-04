@@ -21,8 +21,8 @@ from typing import Any, Callable, Optional
 
 from tradebot.exchange.base import Exchange, mark_yes_no, settle_from_resolution
 from tradebot.exchange.execution_style import decide_execution_style
-from tradebot.exchange.ticks import round_to_tick
-from tradebot.models import Market, Mode, Order, Trade
+from tradebot.exchange.ticks import get_tick_size, round_to_tick
+from tradebot.models import Market, Mode, Order, Resolution, Trade
 
 
 @dataclass
@@ -223,10 +223,16 @@ class PolymarketExchange(Exchange):
             size=result.filled_size, mode=Mode.LIVE, status="open", exec_style=style,
         )
 
-    def settle(self, trade: Trade, force_yes: Optional[bool] = None) -> Optional[Trade]:
+    def settle(
+        self,
+        trade: Trade,
+        force_yes: Optional[bool] = None,
+        resolution: Optional[Resolution] = None,
+    ) -> Optional[Trade]:
         if force_yes is not None:
             return mark_yes_no(trade, bool(force_yes))
-        return settle_from_resolution(trade, self.gamma.get_resolution(trade.market_id), self.log)
+        res = resolution if resolution is not None else self.gamma.get_resolution(trade.market_id)
+        return settle_from_resolution(trade, res, self.log)
 
     def close(self, trade: Trade, market: Market, reason: str = "time") -> Optional[Trade]:
         """Scalp exit on the live book: SELL the position back at the current price.
@@ -235,8 +241,11 @@ class PolymarketExchange(Exchange):
         If the client is missing, the SELL raises, or the response is not accepted,
         the trade is left OPEN and None is returned — never a phantom close."""
         cur = market.yes_price if trade.is_yes else 1.0 - market.yes_price
-        spread = max(market.spread, 0.0)
+        # Floor the spread at one tick (realistic minimum), and cap the loss at the
+        # stake — a long can never lose more than it paid (price floors at 0).
+        spread = max(market.spread, get_tick_size(trade.entry_price))
         pnl = trade.size * (cur - trade.entry_price - spread)
+        pnl = max(pnl, -trade.size * trade.entry_price)
 
         if self.dry_run:
             self.log.info(

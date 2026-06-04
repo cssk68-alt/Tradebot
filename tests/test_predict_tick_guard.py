@@ -39,3 +39,21 @@ def test_normal_tp_still_trades(tmp_path):
     cands, reports = _inputs()
     sigs = _agent(tmp_path, take_profit=0.02, stop_loss=0.03).run(cands, reports)
     assert len(sigs) == 1 and sigs[0].is_yes is True
+
+
+def _inputs_at(yes):
+    c = Candidate(market=Market(id="m", question="q", yes_price=yes))
+    return [c], {"m": ResearchReport(market_id="m", sentiment=0.8, n_sources=8)}
+
+
+def test_extreme_low_price_scalp_blocked_but_resolve_allowed(tmp_path):
+    # Regression (the Elon −16.80 bug at its source): a longshot priced below the
+    # stop-loss distance must NOT be scalped — its stop sits below 0 and its huge
+    # share count makes the spread dwarf the stake. Hold-to-event is fine, though.
+    cands, reports = _inputs_at(0.02)  # price 0.02 < stop_loss 0.07
+    # resolve: the scalp guard does not apply -> a signal IS produced (edge exists),
+    # so the scalp block below is the new guard C, not a missing edge.
+    assert len(_agent(tmp_path, strategy="resolve", stop_loss=0.07, take_profit=0.03)
+               .run(cands, reports)) == 1
+    # scalp: blocked because the 0.07 stop would sit at -0.05 (unreachable).
+    assert _agent(tmp_path, strategy="scalp", stop_loss=0.07, take_profit=0.03).run(cands, reports) == []
