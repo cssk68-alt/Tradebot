@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Optional
 
 from tradebot.llm.client import LLMClient
+from tradebot.log import get_logger
 
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
@@ -43,12 +44,14 @@ class AnthropicClient(LLMClient):
                 max_tokens=max_tokens,
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": user}],
+                timeout=60.0,
             )
             u = getattr(msg, "usage", None)
             if u is not None:
                 self._add_usage(getattr(u, "input_tokens", 0), getattr(u, "output_tokens", 0))
             return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-        except Exception:
+        except Exception as e:
+            get_logger("llm").warning("Anthropic call failed: %s", e)
             return None
 
 

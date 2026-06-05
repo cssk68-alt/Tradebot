@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Optional
 
 from tradebot.llm.client import LLMClient
+from tradebot.log import get_logger
 
 try:
     import httpx
@@ -34,7 +35,7 @@ class DeepSeekClient(LLMClient):
         api_key: str = "",
         model: str = DEFAULT_MODEL,
         base_url: str = DEFAULT_BASE_URL,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ):
         self._api_key = (api_key or "").strip()
         self.model = model
@@ -72,5 +73,6 @@ class DeepSeekClient(LLMClient):
             u = data.get("usage") or {}
             self._add_usage(u.get("prompt_tokens"), u.get("completion_tokens"))
             return data["choices"][0]["message"]["content"]
-        except Exception:
+        except Exception as e:
+            get_logger("llm").warning("DeepSeek call failed: %s", e)
             return None

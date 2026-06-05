@@ -24,9 +24,12 @@ class NeuralBrain:
         self.mu = np.zeros(input_dim)
         self.sd = np.ones(input_dim)
         self.trained = False
+        # Sliding window of recent predictions for constant-output detection
+        self._recent_scores: list[float] = []
 
     def _norm(self, X: np.ndarray) -> np.ndarray:
-        return (X - self.mu) / self.sd
+        raw = (X - self.mu) / self.sd
+        return raw
 
     def _forward(self, Xn: np.ndarray):
         z1 = Xn @ self.w1 + self.b1
@@ -40,11 +43,39 @@ class NeuralBrain:
             return 0.5
         X = np.array([features], dtype=float)
         _, _, out = self._forward(self._norm(X))
-        return float(min(1.0, max(0.0, out[0, 0])))
+        p = float(min(1.0, max(0.0, out[0, 0])))
+        self._recent_scores.append(p)
+        if len(self._recent_scores) > 100:
+            self._recent_scores.pop(0)
+        return p
+
+    def predict_raw(self, features: list[float]) -> dict:
+        """Predict and return raw intermediate values for diagnostics.
+        Returns {'score': float, 'z2_raw': float, 'active_neurons': int}."""
+        if not self.trained:
+            return {"score": 0.5, "z2_raw": 0.0, "active_neurons": 0}
+        X = np.array([features], dtype=float)
+        Xn = self._norm(X)
+        z1, a1, out = self._forward(Xn)
+        p = float(min(1.0, max(0.0, out[0, 0])))
+        return {
+            "score": p,
+            "z2_raw": float(z1[0, 0]),
+            "active_neurons": int(np.sum(a1 > 0)),
+        }
+
+    def score_variance(self, window: int = 20) -> float:
+        """Variance of the last `window` predictions. Returns 0.0 if fewer
+        than 2 scores available — used for constant-output detection."""
+        recent = self._recent_scores[-window:]
+        if len(recent) < 2:
+            return 0.0
+        return float(np.var(recent))
 
     def train(
         self, X: list[list[float]], y: list[int],
         epochs: int = 400, lr: float = 0.05, l2: float = 0.0,
+        sample_weights: list[float] | None = None,
     ) -> bool:
         if len(y) < 8 or len(set(y)) < 2:
             return False
@@ -56,11 +87,19 @@ class NeuralBrain:
         self.sd = Xa.std(axis=0) + 1e-6
         Xn = self._norm(Xa)
         n = len(ya)
+
+        # Sample weighting: scale per-row gradient by sample_weights[i].
+        # Default: all rows equal (weight = 1.0/n).
+        if sample_weights is not None and len(sample_weights) == n:
+            sw = np.array(sample_weights, dtype=float).reshape(-1, 1)
+            sw = sw / sw.sum() * n  # renormalize so mean weight = 1.0
+        else:
+            sw = np.ones((n, 1)) / n
+
         for _ in range(epochs):
             z1, a1, out = self._forward(Xn)
-            d2 = (out - ya) / n  # gradient of BCE wrt z2 (sigmoid)
-            # L2 weight decay on the WEIGHTS only (not biases): shrinks noise-feature
-            # weights toward 0 so the net learns which features matter + generalizes.
+            # Per-row weighted BCE gradient: (out - ya) * sw / n
+            d2 = (out - ya) * sw  # each row scaled by its sample weight
             dw2 = a1.T @ d2 + l2 * self.w2
             db2 = d2.sum(axis=0)
             da1 = d2 @ self.w2.T
@@ -114,6 +153,7 @@ class TorchBrain:
         self.mu = np.zeros(input_dim)
         self.sd = np.ones(input_dim)
         self.trained = False
+        self._recent_scores: list[float] = []
 
     def _norm(self, X: np.ndarray) -> np.ndarray:
         return (X - self.mu) / self.sd
@@ -125,11 +165,37 @@ class TorchBrain:
         x = t.tensor(self._norm(np.array([features], dtype=float)), dtype=t.float32)
         with t.no_grad():
             p = t.sigmoid(self.net(x)).item()
-        return float(min(1.0, max(0.0, p)))
+        p = float(min(1.0, max(0.0, p)))
+        self._recent_scores.append(p)
+        if len(self._recent_scores) > 100:
+            self._recent_scores.pop(0)
+        return p
+
+    def predict_raw(self, features: list[float]) -> dict:
+        if not self.trained:
+            return {"score": 0.5, "z2_raw": 0.0, "active_neurons": 0}
+        t = self.torch
+        Xn = self._norm(np.array([features], dtype=float))
+        xt = t.tensor(Xn, dtype=t.float32)
+        with t.no_grad():
+            logits = self.net(xt)
+            p = t.sigmoid(logits).item()
+        return {
+            "score": float(min(1.0, max(0.0, p))),
+            "z2_raw": float(logits.item()),
+            "active_neurons": 0,
+        }
+
+    def score_variance(self, window: int = 20) -> float:
+        recent = self._recent_scores[-window:]
+        if len(recent) < 2:
+            return 0.0
+        return float(t.var(t.tensor(recent)).item())
 
     def train(
         self, X: list[list[float]], y: list[int],
         epochs: int = 400, lr: float = 0.05, l2: float = 0.0,
+        sample_weights: list[float] | None = None,
     ) -> bool:
         if len(y) < 8 or len(set(y)) < 2:
             return False
@@ -141,9 +207,18 @@ class TorchBrain:
         self.sd = Xa.std(axis=0) + 1e-6
         xt = t.tensor(self._norm(Xa), dtype=t.float32)
         yt = t.tensor(np.array(y, dtype=float).reshape(-1, 1), dtype=t.float32)
+
+        # Sample weighting for PyTorch: use per-element weight in BCEWithLogitsLoss
+        if sample_weights is not None and len(sample_weights) == len(y):
+            sw = np.array(sample_weights, dtype=float)
+            sw = sw / sw.mean()  # renormalize so mean weight = 1.0
+            weight_t = t.tensor(sw, dtype=t.float32)
+        else:
+            weight_t = None
+
         # weight_decay == L2 regularization (Problem 2: flexible feature weighting).
         opt = t.optim.Adam(self.net.parameters(), lr=lr, weight_decay=l2)
-        loss_fn = t.nn.BCEWithLogitsLoss()
+        loss_fn = t.nn.BCEWithLogitsLoss(weight=weight_t)
         for _ in range(epochs):
             opt.zero_grad()
             loss_fn(self.net(xt), yt).backward()

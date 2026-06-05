@@ -1,5 +1,38 @@
 # Aktueller Stand
 
+Stand: 2026-06-05 · `main`
+
+## Bugfixes: Veto-Score Logik & LLM Exception-Logging (2026-06-05)
+
+### Fix 1 — MLP Veto-Score Widerspruch (`llm/client.py`)
+- **Problem:** `brain_score = 0.000` wurde bei NO-Trades fälschlicherweise als "high confidence"
+  interpretiert (LLM verwechselte den Score mit P(YES)). Beim gleichen Score auf YES-Trades hieß es
+  korrekt "no confidence" — inkonsistent.
+- **Ursache:** System-Prompt beschrieb den Score nur als "(higher = more confident the trade wins)"
+  ohne klarzustellen, dass es P(traded side wins) ist, NICHT P(YES). Das LLM las low score + NO-Trade
+  als "MLP bestätigt die NO-Seite" statt als "MLP sagt dieser Trade verliert".
+- **Fix:**
+  - System-Prompt explizit: "P(the TRADED side wins); NOT P(YES). On a NO trade, a score of 0.0
+    means the MLP expects the NO bet to LOSE."
+  - User-Prompt zeigt jetzt `MLP veto score P(NO wins): 0.000` statt nur `MLP veto score: 0.000`
+    → LLM kann den Score nie mehr in der falschen Richtung interpretieren.
+
+### Fix 2 — LLM Exceptions stumm verschluckt (`llm/deepseek.py`, `llm/claude.py`)
+- **Problem:** `_complete()` fing alle Exceptions ohne Logging — bei Timeout/5xx/Netzfehler sah man
+  nur den INFO-Log "(no answer - call failed)", aber nie die Fehlerursache. Freeze-Debugging war
+  unmöglich.
+- **Fix:** `except Exception as e: get_logger("llm").warning("DeepSeek/Anthropic call failed: %s", e)`
+  → Fehlerursache (Timeout, HTTP-Fehler, etc.) ist jetzt im Log sichtbar.
+
+### Fix 3 — Freeze-Log Lücke: Postmortem startet unsichtbar (`agents/postmortem.py`)
+- **Problem:** Zwischen "Gamma: fetched 300 active markets" und "Scan: X/300 markets passed filters"
+  laufen ggf. postmortem-LLM-Aufrufe (für aufgelöste Trades in `manage_open` → `_after_resolved`).
+  Diese Phase war komplett stumm → bei LLM-Hänger sah es aus wie ein Freeze ohne Ursache.
+- **Fix:** `run()` loggt jetzt bei Beginn: "Postmortem: analyzing N resolved trade(s) via LLM"
+  → der Freeze-Ort ist sofort im Log erkennbar.
+
+---
+
 Stand: 2026-06-04 · `main` (Refactor gemerged aus `claude/inspiring-keller-tRIBa`)
 
 ## Brain-Learning: Counterfactuals (Veto/Mirror), Validierung & Feature-Importance (neu, 2026-06-04)

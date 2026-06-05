@@ -1,353 +1,17 @@
 {
-  "generated_at": "2026-06-04T19:19:15.092802+00:00",
+  "generated_at": "2026-06-05T07:18:23.309228+00:00",
   "mode": "paper",
   "starting_bankroll": 1000.0,
-  "bankroll": 901.69,
-  "realized_pnl": -98.31,
-  "n_trades": 82,
-  "n_wins": 10,
-  "n_losses": 72,
-  "win_rate": 0.122,
+  "bankroll": 896.54,
+  "realized_pnl": -103.46,
+  "n_trades": 103,
+  "n_wins": 13,
+  "n_losses": 90,
+  "win_rate": 0.1262,
   "n_open": 0,
   "n_pending_maker": 0,
   "open_trades": [],
   "resolved_trades": [
-    {
-      "question": "Will Alexander Zverev win the 2026 Men's French Open?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.386,
-      "exit": 0.386,
-      "size": 8.4,
-      "edge": 0.151,
-      "brain": 0.5,
-      "pnl": -0.08,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T15:59:07.007550+00:00",
-      "resolved_at": "2026-06-04T16:09:46.632112+00:00"
-    },
-    {
-      "question": "Iran leadership change by June 30?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.966,
-      "exit": 0.962,
-      "size": 3.4,
-      "edge": 0.024,
-      "brain": 0.5,
-      "pnl": -0.05,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T15:59:07.016315+00:00",
-      "resolved_at": "2026-06-04T16:09:46.637355+00:00"
-    },
-    {
-      "question": "Baltimore Orioles vs. Boston Red Sox",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.475,
-      "exit": 0.475,
-      "size": 6.8,
-      "edge": 0.062,
-      "brain": 0.5,
-      "pnl": -0.07,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.815968+00:00",
-      "resolved_at": "2026-06-04T16:11:33.722410+00:00"
-    },
-    {
-      "question": "Will the New York Knicks win the 2026 NBA Finals?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.466,
-      "exit": 0.466,
-      "size": 7.0,
-      "edge": 0.17,
-      "brain": 0.5,
-      "pnl": -0.07,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.822779+00:00",
-      "resolved_at": "2026-06-04T16:11:33.733709+00:00"
-    },
-    {
-      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.534,
-      "exit": 0.534,
-      "size": 6.1,
-      "edge": 0.099,
-      "brain": 0.5,
-      "pnl": -0.06,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.831569+00:00",
-      "resolved_at": "2026-06-04T16:11:33.739638+00:00"
-    },
-    {
-      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.545,
-      "exit": 0.54,
-      "size": 6.0,
-      "edge": 0.124,
-      "brain": 0.5,
-      "pnl": -0.15,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.839309+00:00",
-      "resolved_at": "2026-06-04T16:11:33.745329+00:00"
-    },
-    {
-      "question": "Los Angeles Dodgers vs. Arizona Diamondbacks",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.555,
-      "exit": 0.555,
-      "size": 5.9,
-      "edge": 0.129,
-      "brain": 0.5,
-      "pnl": -0.06,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.854936+00:00",
-      "resolved_at": "2026-06-04T16:11:33.750392+00:00"
-    },
-    {
-      "question": "Will the Vegas Golden Knights win the 2026 NHL Stanley Cup?",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.586,
-      "exit": 0.585,
-      "size": 5.5,
-      "edge": 0.083,
-      "brain": 0.5,
-      "pnl": -0.06,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.863393+00:00",
-      "resolved_at": "2026-06-04T16:11:33.755796+00:00"
-    },
-    {
-      "question": "Cleveland Guardians vs. New York Yankees",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.395,
-      "exit": 0.395,
-      "size": 8.2,
-      "edge": 0.052,
-      "brain": 0.5,
-      "pnl": -0.08,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.869490+00:00",
-      "resolved_at": "2026-06-04T16:11:33.761509+00:00"
-    },
-    {
-      "question": "Will Alexander Zverev win the 2026 Men's French Open?",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.614,
-      "exit": 0.614,
-      "size": 5.3,
-      "edge": 0.175,
-      "brain": 0.5,
-      "pnl": -0.05,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:00:59.877618+00:00",
-      "resolved_at": "2026-06-04T16:11:33.766335+00:00"
-    },
-    {
-      "question": "Prostejov: Taro Daniel vs Damir Dzumhur",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.445,
-      "exit": 0.66,
-      "size": 7.3,
-      "edge": 0.03,
-      "brain": 0.999,
-      "pnl": 1.28,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.248960+00:00",
-      "resolved_at": "2026-06-04T16:11:33.772477+00:00"
-    },
-    {
-      "question": "Prostejov: Taro Daniel vs Damir Dzumhur",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.445,
-      "exit": 0.66,
-      "size": 7.3,
-      "edge": 0.042,
-      "brain": 0.916,
-      "pnl": 1.28,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:05:58.136573+00:00",
-      "resolved_at": "2026-06-04T16:11:33.778519+00:00"
-    },
-    {
-      "question": "Prostejov: Taro Daniel vs Damir Dzumhur",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.445,
-      "exit": 0.66,
-      "size": 6.7,
-      "edge": 0.036,
-      "brain": 0.998,
-      "pnl": 1.17,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:11:22.699331+00:00",
-      "resolved_at": "2026-06-04T16:11:33.784268+00:00"
-    },
-    {
-      "question": "Roland Garros WTA: Diana Shnaider vs Maja Chwalinska",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.555,
-      "exit": 0.605,
-      "size": 5.4,
-      "edge": 0.035,
-      "brain": 0.894,
-      "pnl": 0.22,
-      "won": true,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:11:22.706522+00:00",
-      "resolved_at": "2026-06-04T16:11:33.788377+00:00"
-    },
-    {
-      "question": "US-Iran nuclear deal by June 30?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.695,
-      "exit": 0.695,
-      "size": 4.7,
-      "edge": 0.065,
-      "brain": 0.996,
-      "pnl": -0.05,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.258328+00:00",
-      "resolved_at": "2026-06-04T16:13:22.252272+00:00"
-    },
-    {
-      "question": "Baltimore Orioles vs. Boston Red Sox",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.475,
-      "exit": 0.475,
-      "size": 6.9,
-      "edge": 0.115,
-      "brain": 1.0,
-      "pnl": -0.07,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.266519+00:00",
-      "resolved_at": "2026-06-04T16:13:22.263499+00:00"
-    },
-    {
-      "question": "Will the San Antonio Spurs win the 2026 NBA Finals?",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.466,
-      "exit": 0.466,
-      "size": 7.0,
-      "edge": 0.111,
-      "brain": 1.0,
-      "pnl": -0.07,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.274860+00:00",
-      "resolved_at": "2026-06-04T16:13:22.270134+00:00"
-    },
-    {
-      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 30, 2026?",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.455,
-      "exit": 0.46,
-      "size": 7.2,
-      "edge": 0.026,
-      "brain": 0.999,
-      "pnl": -0.11,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.283274+00:00",
-      "resolved_at": "2026-06-04T16:13:22.276107+00:00"
-    },
-    {
-      "question": "Los Angeles Dodgers vs. Arizona Diamondbacks",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "maker",
-      "entry": 0.555,
-      "exit": 0.555,
-      "size": 5.9,
-      "edge": 0.139,
-      "brain": 1.0,
-      "pnl": -0.06,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.298336+00:00",
-      "resolved_at": "2026-06-04T16:13:22.281631+00:00"
-    },
-    {
-      "question": "US announces new Iran agreement/ceasefire extension by June 30?",
-      "side": "NO",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.435,
-      "exit": 0.435,
-      "size": 7.5,
-      "edge": 0.024,
-      "brain": 0.978,
-      "pnl": -0.07,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.305393+00:00",
-      "resolved_at": "2026-06-04T16:13:22.288075+00:00"
-    },
-    {
-      "question": "Will the Carolina Hurricanes win the 2026 NHL Stanley Cup?",
-      "side": "YES",
-      "kind": "scalp",
-      "exec_style": "taker",
-      "entry": 0.415,
-      "exit": 0.415,
-      "size": 7.8,
-      "edge": 0.049,
-      "brain": 1.0,
-      "pnl": -0.08,
-      "won": false,
-      "mode": "paper",
-      "opened_at": "2026-06-04T16:02:48.313419+00:00",
-      "resolved_at": "2026-06-04T16:13:22.293494+00:00"
-    },
     {
       "question": "Will Bitcoin dip to $55,000 in June?",
       "side": "NO",
@@ -811,6 +475,342 @@
       "mode": "paper",
       "opened_at": "2026-06-04T16:34:47.023336+00:00",
       "resolved_at": "2026-06-04T16:44:53.324818+00:00"
+    },
+    {
+      "question": "Will the price of Bitcoin be above $64,000 on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.552,
+      "exit": 0.552,
+      "size": 62.6,
+      "edge": 0.07,
+      "brain": 0.67,
+      "pnl": -0.75,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T19:53:32.445930+00:00",
+      "resolved_at": "2026-06-04T19:59:05.451658+00:00"
+    },
+    {
+      "question": "Bitcoin Up or Down on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 45.1,
+      "edge": 0.05,
+      "brain": 1.0,
+      "pnl": -0.45,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:06:03.867841+00:00",
+      "resolved_at": "2026-06-04T20:11:27.900482+00:00"
+    },
+    {
+      "question": "Athletics vs. Chicago Cubs",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 108.3,
+      "edge": 0.12,
+      "brain": 1.0,
+      "pnl": -1.08,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:06:03.867841+00:00",
+      "resolved_at": "2026-06-04T20:11:27.902914+00:00"
+    },
+    {
+      "question": "Will the price of Bitcoin be above $64,000 on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.593,
+      "exit": 0.653,
+      "size": 44.8,
+      "edge": 0.049,
+      "brain": 0.846,
+      "pnl": 2.24,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:06:03.867841+00:00",
+      "resolved_at": "2026-06-04T20:11:27.905387+00:00"
+    },
+    {
+      "question": "Bitcoin Up or Down on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.615,
+      "size": 45.1,
+      "edge": 0.05,
+      "brain": 1.0,
+      "pnl": 2.26,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:07:25.862651+00:00",
+      "resolved_at": "2026-06-04T20:12:53.222289+00:00"
+    },
+    {
+      "question": "Athletics vs. Chicago Cubs",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 90.3,
+      "edge": 0.1,
+      "brain": 1.0,
+      "pnl": -0.9,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:07:25.862651+00:00",
+      "resolved_at": "2026-06-04T20:12:53.224956+00:00"
+    },
+    {
+      "question": "Bitcoin Up or Down on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.615,
+      "size": 45.1,
+      "edge": 0.05,
+      "brain": 1.0,
+      "pnl": 2.26,
+      "won": true,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:10:03.305107+00:00",
+      "resolved_at": "2026-06-04T20:12:53.227734+00:00"
+    },
+    {
+      "question": "Athletics vs. Chicago Cubs",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 90.3,
+      "edge": 0.1,
+      "brain": 1.0,
+      "pnl": -0.9,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:10:03.305107+00:00",
+      "resolved_at": "2026-06-04T20:15:36.806459+00:00"
+    },
+    {
+      "question": "Athletics vs. Chicago Cubs",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 90.3,
+      "edge": 0.1,
+      "brain": 1.0,
+      "pnl": -0.9,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:11:27.893106+00:00",
+      "resolved_at": "2026-06-04T20:16:59.987400+00:00"
+    },
+    {
+      "question": "Bitcoin Up or Down on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.615,
+      "exit": 0.615,
+      "size": 45.1,
+      "edge": 0.05,
+      "brain": 1.0,
+      "pnl": -0.45,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:12:53.217008+00:00",
+      "resolved_at": "2026-06-04T20:18:27.518266+00:00"
+    },
+    {
+      "question": "Athletics vs. Chicago Cubs",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.555,
+      "exit": 0.555,
+      "size": 90.3,
+      "edge": 0.1,
+      "brain": 1.0,
+      "pnl": -0.9,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:12:53.217008+00:00",
+      "resolved_at": "2026-06-04T20:18:27.523197+00:00"
+    },
+    {
+      "question": "T20 Blast: Somerset vs Glamorgan",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.465,
+      "exit": 0.465,
+      "size": 58.5,
+      "edge": 0.065,
+      "brain": 0.953,
+      "pnl": -0.59,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:15:36.799835+00:00",
+      "resolved_at": "2026-06-04T20:21:25.173350+00:00"
+    },
+    {
+      "question": "T20 Blast: Somerset vs Glamorgan",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.465,
+      "exit": 0.465,
+      "size": 63.0,
+      "edge": 0.07,
+      "brain": 0.883,
+      "pnl": -0.63,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:16:59.981855+00:00",
+      "resolved_at": "2026-06-04T20:22:49.574574+00:00"
+    },
+    {
+      "question": "T20 Blast: Somerset vs Glamorgan",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.465,
+      "exit": 0.465,
+      "size": 58.3,
+      "edge": 0.065,
+      "brain": 0.927,
+      "pnl": -0.58,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:21:25.167764+00:00",
+      "resolved_at": "2026-06-04T20:26:53.603201+00:00"
+    },
+    {
+      "question": "Will the price of Bitcoin be above $64,000 on June 5?",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.618,
+      "exit": 0.618,
+      "size": 54.7,
+      "edge": 0.058,
+      "brain": 0.993,
+      "pnl": -0.55,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:24:05.544423+00:00",
+      "resolved_at": "2026-06-04T20:29:47.944735+00:00"
+    },
+    {
+      "question": "Tyler: Blaise Bicknell vs Karl Poling",
+      "side": "YES",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.69,
+      "exit": 0.69,
+      "size": 41.7,
+      "edge": 0.04,
+      "brain": 0.673,
+      "pnl": -0.83,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-04T20:29:47.939619+00:00",
+      "resolved_at": "2026-06-04T20:35:11.225673+00:00"
+    },
+    {
+      "question": "Spread: Spurs (-6.5)",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.505,
+      "exit": 0.505,
+      "size": 51.8,
+      "edge": 0.06,
+      "brain": 0.901,
+      "pnl": -0.52,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-05T05:47:22.656215+00:00",
+      "resolved_at": "2026-06-05T05:54:00.082077+00:00"
+    },
+    {
+      "question": "Spread: Spurs (-6.5)",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.505,
+      "exit": 0.505,
+      "size": 51.8,
+      "edge": 0.06,
+      "brain": 0.901,
+      "pnl": -0.52,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-05T05:48:41.989330+00:00",
+      "resolved_at": "2026-06-05T05:55:30.119153+00:00"
+    },
+    {
+      "question": "Spread: Spurs (-6.5)",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.505,
+      "exit": 0.505,
+      "size": 41.0,
+      "edge": 0.047,
+      "brain": 0.947,
+      "pnl": -0.41,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-05T05:50:03.273469+00:00",
+      "resolved_at": "2026-06-05T05:56:55.152752+00:00"
+    },
+    {
+      "question": "Spread: Spurs (-6.5)",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.505,
+      "exit": 0.505,
+      "size": 41.0,
+      "edge": 0.047,
+      "brain": 0.99,
+      "pnl": -0.41,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-05T05:52:43.312698+00:00",
+      "resolved_at": "2026-06-05T05:59:23.936744+00:00"
+    },
+    {
+      "question": "Spread: Spurs (-6.5)",
+      "side": "NO",
+      "kind": "scalp",
+      "exec_style": "taker",
+      "entry": 0.505,
+      "exit": 0.505,
+      "size": 51.8,
+      "edge": 0.06,
+      "brain": 0.977,
+      "pnl": -0.52,
+      "won": false,
+      "mode": "paper",
+      "opened_at": "2026-06-05T05:55:30.112734+00:00",
+      "resolved_at": "2026-06-05T06:02:28.442180+00:00"
     }
   ],
   "equity_curve": [
@@ -1223,159 +1223,264 @@
       "t": "2026-06-04T16:44:53.324818+00:00",
       "pnl": -0.01,
       "cum": 901.69
+    },
+    {
+      "t": "2026-06-04T19:59:05.451658+00:00",
+      "pnl": -0.75,
+      "cum": 900.93
+    },
+    {
+      "t": "2026-06-04T20:11:27.900482+00:00",
+      "pnl": -0.45,
+      "cum": 900.48
+    },
+    {
+      "t": "2026-06-04T20:11:27.902914+00:00",
+      "pnl": -1.08,
+      "cum": 899.4
+    },
+    {
+      "t": "2026-06-04T20:11:27.905387+00:00",
+      "pnl": 2.24,
+      "cum": 901.64
+    },
+    {
+      "t": "2026-06-04T20:12:53.222289+00:00",
+      "pnl": 2.26,
+      "cum": 903.9
+    },
+    {
+      "t": "2026-06-04T20:12:53.224956+00:00",
+      "pnl": -0.9,
+      "cum": 903.0
+    },
+    {
+      "t": "2026-06-04T20:12:53.227734+00:00",
+      "pnl": 2.26,
+      "cum": 905.25
+    },
+    {
+      "t": "2026-06-04T20:15:36.806459+00:00",
+      "pnl": -0.9,
+      "cum": 904.35
+    },
+    {
+      "t": "2026-06-04T20:16:59.987400+00:00",
+      "pnl": -0.9,
+      "cum": 903.45
+    },
+    {
+      "t": "2026-06-04T20:18:27.518266+00:00",
+      "pnl": -0.45,
+      "cum": 903.0
+    },
+    {
+      "t": "2026-06-04T20:18:27.523197+00:00",
+      "pnl": -0.9,
+      "cum": 902.09
+    },
+    {
+      "t": "2026-06-04T20:21:25.173350+00:00",
+      "pnl": -0.59,
+      "cum": 901.51
+    },
+    {
+      "t": "2026-06-04T20:22:49.574574+00:00",
+      "pnl": -0.63,
+      "cum": 900.88
+    },
+    {
+      "t": "2026-06-04T20:26:53.603201+00:00",
+      "pnl": -0.58,
+      "cum": 900.29
+    },
+    {
+      "t": "2026-06-04T20:29:47.944735+00:00",
+      "pnl": -0.55,
+      "cum": 899.75
+    },
+    {
+      "t": "2026-06-04T20:35:11.225673+00:00",
+      "pnl": -0.83,
+      "cum": 898.91
+    },
+    {
+      "t": "2026-06-05T05:54:00.082077+00:00",
+      "pnl": -0.52,
+      "cum": 898.4
+    },
+    {
+      "t": "2026-06-05T05:55:30.119153+00:00",
+      "pnl": -0.52,
+      "cum": 897.88
+    },
+    {
+      "t": "2026-06-05T05:56:55.152752+00:00",
+      "pnl": -0.41,
+      "cum": 897.47
+    },
+    {
+      "t": "2026-06-05T05:59:23.936744+00:00",
+      "pnl": -0.41,
+      "cum": 897.06
+    },
+    {
+      "t": "2026-06-05T06:02:28.442180+00:00",
+      "pnl": -0.52,
+      "cum": 896.54
     }
   ],
   "brain": {
     "trained": true,
-    "experiences": 105,
-    "wins": 22,
-    "losses": 83
+    "experiences": 151,
+    "wins": 44,
+    "losses": 107
   },
   "lessons": [
     {
-      "category": "timing",
-      "cause": "Expiration risk too high for small edge",
-      "recommendation": "Avoid binary trades with <1 month to expiry unless edge >0.10"
+      "category": "risk",
+      "cause": "Overconfidence in high-brain trade with low edge",
+      "recommendation": "Cap brain threshold or require higher edge for high-brain entries"
     },
     {
       "category": "timing",
-      "cause": "Entry too late after odds shifted",
-      "recommendation": "Set strict entry thresholds and avoid chasing after initial edge window closes"
+      "cause": "Entry at 0.51 with edge 0.05 left minimal buffer against adverse moves",
+      "recommendation": "Require entry price below 0.40 for high-brain trades to ensure sufficient margin"
+    },
+    {
+      "category": "risk",
+      "cause": "Overconfidence in high-brain edge without sufficient margin for variance",
+      "recommendation": "Cap brain at 0.8 for binary outcomes to limit downside"
+    },
+    {
+      "category": "risk",
+      "cause": "Overconfidence in high-brain trade with insufficient edge",
+      "recommendation": "Cap brain at 0.80 for edges below 0.10 to avoid outsized losses"
+    },
+    {
+      "category": "risk",
+      "cause": "Overconfidence in high-brain trade with insufficient edge relative to entry cost",
+      "recommendation": "Require edge-to-cost ratio > 0.2 for high-brain trades"
     },
     {
       "category": "timing",
-      "cause": "Entered too early before odds stabilized",
-      "recommendation": "Wait for market depth and late odds shifts before entry"
+      "cause": "Entered near peak price without confirmation of momentum reversal",
+      "recommendation": "Wait for price to retrace to brain level before entry, not at edge peak"
     },
     {
       "category": "timing",
-      "cause": "Entered too early before odds stabilized",
-      "recommendation": "Wait for odds to settle closer to fight start to confirm edge"
+      "cause": "Entry at 0.62 with 0.06 edge insufficient for 0.99 brain confidence; overbet on low probability edge",
+      "recommendation": "Align position size with edge-to-brain ratio; avoid high conviction on thin edges"
     },
     {
       "category": "timing",
-      "cause": "Entered too early before June started, losing edge to time decay",
-      "recommendation": "Wait until the month begins or use conditional entry near expiry to reduce theta risk"
+      "cause": "Entry at 0.47 with 0.07 edge gave insufficient buffer against adverse movement in a volatile T20 match",
+      "recommendation": "Require minimum edge of 0.15 for binary cricket trades to absorb late swings"
     },
     {
       "category": "timing",
-      "cause": "Entered too early before odds stabilized",
-      "recommendation": "Wait for market depth and late odds movement before entry"
+      "cause": "Entered too early before market confirmed edge",
+      "recommendation": "Wait for price to approach edge zone before entry"
     },
     {
       "category": "timing",
-      "cause": "Overestimated probability of early resolution; market priced in lower chance of event occurring before deadline.",
-      "recommendation": "Incorporate time decay and event likelihood curves into edge calculation."
+      "cause": "Entry too early before market confirmation",
+      "recommendation": "Wait for price to cross 0.50 before entering with edge"
     },
     {
       "category": "timing",
-      "cause": "Overestimated probability of near-term policy reversal despite low base rate",
-      "recommendation": "Apply stricter time decay adjustments for binary geopolitical events with long horizons"
+      "cause": "Entry at 0.56 with edge 0.10 gave insufficient buffer against adverse moves, leading to loss despite high conviction.",
+      "recommendation": "Require a minimum entry edge of 0.15 or tighter stop-loss to protect against volatility in binary outcomes."
     },
     {
       "category": "timing",
-      "cause": "Entered too early before market stabilized",
-      "recommendation": "Wait for higher brain confirmation or tighter entry threshold"
-    },
-    {
-      "category": "timing",
-      "cause": "Entered too early before odds shifted against position",
-      "recommendation": "Wait for odds to stabilize closer to fight start to confirm edge"
-    },
-    {
-      "category": "timing",
-      "cause": "Overestimated probability of early resolution; market priced in lower chance of event occurring before deadline.",
-      "recommendation": "Reduce position size when edge is small and time to expiry is long; prioritize catalysts near resolution."
-    },
-    {
-      "category": "timing",
-      "cause": "Entered at 0.00 with no price movement buffer, edge too small to overcome adverse fills or late entry",
-      "recommendation": "Wait for price confirmation above 0.01 before entering, or increase edge threshold to 0.05 for zero-price entries"
+      "cause": "Entry too early before signal confirmation",
+      "recommendation": "Wait for price action to confirm edge before entering"
     }
   ],
   "hold_recommendation": {
     "status": "ok",
-    "n": 82,
-    "n_won": 10,
-    "n_lost": 72,
-    "p50": 253.9,
-    "p75": 327.5,
-    "p95": 606.4,
-    "current": 315.0,
+    "n": 103,
+    "n_won": 13,
+    "n_lost": 90,
+    "p50": 303.0,
+    "p75": 327.4,
+    "p95": 584.4,
+    "current": 390.0,
     "recommended": 393.0,
-    "direction": "raise",
-    "message": "Gewinner brauchen oft laenger (P75 327s) als das aktuelle Limit (315s) \u2014 erwaege Erhoehung auf ~393s, sonst werden reifende Gewinner zu frueh geschlossen."
+    "direction": "keep",
+    "message": "Aktuelles Limit (390s) passt gut zur Gewinner-Haltedauer (P75 327s)."
   },
   "brain_diagnostics": {
     "oos": {
       "status": "ok",
-      "n_train": 79,
-      "n_test": 26,
-      "accuracy": 0.6923,
-      "logloss": 2.6307,
-      "auc": 0.5208
+      "n_train": 113,
+      "n_test": 38,
+      "accuracy": 0.4211,
+      "logloss": 7.0,
+      "auc": 0.2898
     },
     "feature_importance": [
       {
-        "name": "dist_from_half",
-        "importance": 1.0932
+        "name": "is_yes",
+        "importance": 3.1682
       },
       {
-        "name": "spread",
-        "importance": 0.9284
+        "name": "exec_edge",
+        "importance": 1.9397
       },
       {
-        "name": "log_sources",
-        "importance": 0.7495
+        "name": "log_volume",
+        "importance": 0.3113
+      },
+      {
+        "name": "rss_sentiment",
+        "importance": 0.2687
       },
       {
         "name": "yes_price",
-        "importance": 0.5697
+        "importance": 0.2049
       },
       {
-        "name": "days_norm",
-        "importance": 0.4439
+        "name": "dist_from_half",
+        "importance": 0.187
       },
       {
-        "name": "fav_flag",
-        "importance": 0.219
-      },
-      {
-        "name": "rss_log_sources",
-        "importance": 0.0216
+        "name": "log_sources",
+        "importance": 0.1498
       },
       {
         "name": "fact_confidence",
-        "importance": 0.0043
+        "importance": 0.0529
       }
     ],
     "counterfactuals": {
-      "pending": 135,
-      "settled": 23,
-      "brain_right": 1,
-      "brain_wrong": 1
+      "pending": 72,
+      "settled": 48,
+      "brain_right": 5,
+      "brain_wrong": 12
     },
     "experiences": {
-      "real": 82,
-      "counterfactual": 23,
-      "total": 105
+      "real": 103,
+      "counterfactual": 48,
+      "total": 151
     }
   },
   "circuit_breaker": {
     "tripped": false,
     "reason": "",
-    "realized_today": -98.31,
-    "consecutive_losses": 18
+    "realized_today": -2.37,
+    "consecutive_losses": 14
   },
   "config": {
     "kelly_fraction": 0.3,
     "edge_threshold": 0.05,
     "confidence_threshold": 0.6,
     "max_trade_pct": 0.2,
-    "brain_veto_threshold": 0.25,
-    "max_spread": 0.03,
+    "brain_veto_threshold": 0.2,
+    "max_spread": 0.035,
     "max_daily_loss_pct": 0.08,
     "max_consecutive_losses": 8,
-    "max_hold_seconds": 315
+    "max_hold_seconds": 390
   }
 }

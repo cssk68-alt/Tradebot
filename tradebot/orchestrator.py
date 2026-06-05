@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
+from tradebot import watchdog as _wd
 from tradebot.agents.brain_manager import BrainManager
 from tradebot.agents.postmortem import PostmortemAgent
 from tradebot.agents.predict import PredictAgent
@@ -69,7 +70,55 @@ class Orchestrator:
         # / CLI) can stop the run and wind down open positions gracefully.
         self.breaker_reason = ""
 
+        _wd.start(log=log)
         self._train_models()
+        self._resume_queue()
+
+    # --- startup recovery ---
+    def _resume_queue(self) -> None:
+        """Retry any 'pending' execution-queue entries left over from a previous crash."""
+        pending = self.store.pending_executions()
+        if not pending:
+            return
+        self.log.warning("ExecutionQueue: resuming %d pending trade(s) from previous run", len(pending))
+        for row in pending:
+            eid = row["execution_id"]
+            market_id = row["market_id"]
+            is_yes = bool(row["is_yes"])
+            retries = int(row["retries"])
+
+            if retries >= 3:
+                self.log.warning("ExecutionQueue: %s exceeded max retries — marking failed", market_id)
+                self.store.mark_execution_failed(eid, "max retries exceeded on resume")
+                continue
+
+            if self.store.has_open_execution(market_id, is_yes, self.mode):
+                self.log.info("ExecutionQueue: open trade already exists for %s — marking done (idempotent)", market_id)
+                self.store.mark_execution_done(eid)
+                continue
+
+            try:
+                from tradebot.models import Order
+                order = Order.model_validate_json(row["order_json"])
+            except Exception as e:
+                self.log.error("ExecutionQueue: cannot parse order for %s: %s — marking failed", market_id, e)
+                self.store.mark_execution_failed(eid, str(e))
+                continue
+
+            try:
+                trade = self.exchange.place_order(order)
+            except Exception as e:
+                self.log.warning("ExecutionQueue: place_order failed for %s: %s", market_id, e)
+                self.store.bump_execution_retry(eid, str(e))
+                continue
+
+            if trade is not None:
+                trade.kind = "scalp" if self.settings.strategy == "scalp" else "resolve"
+                self.store.save_trade(trade)
+                self.store.mark_execution_done(eid)
+                self.log.info("ExecutionQueue: resumed trade for '%s'", market_id[:40])
+            else:
+                self.store.bump_execution_retry(eid, "place_order returned None on resume")
 
     # --- learning ---
     def _train_models(self) -> None:
@@ -145,6 +194,7 @@ class Orchestrator:
         learn = bool(getattr(self.settings, "learn_from_vetos", True))
         spread_floor = getattr(self.settings, "min_spread_cost", 0.01)
         added = 0
+        settled_pairs: dict[str, dict] = {}  # market_id -> {real, mirror}
         for cf in pending:
             series = self.store.snapshots_between(cf.market_id, cf.entry_ts, now)
             res = settle_scalp_path(
@@ -170,9 +220,22 @@ class Orchestrator:
                         )
                     )
                     added += 1
+                    # Track paired outcomes for reflection logging
+                    settled_pairs[cf.market_id] = {
+                        "is_yes": cf.is_yes,
+                        "won": cf.won,
+                        "source": cf.source,
+                    }
             else:
                 self.store.update_counterfactual(cf)
+
         if added:
+            # Log counterfactual reflection insights for paired markets
+            for mid, outcome in settled_pairs.items():
+                # If we have a pair (both mirror and veto settled for same market)
+                # we could log a reflection insight here, but the minimal approach
+                # just logs that we added weighted experiences.
+                pass
             self._train_models()
             self.log.info("Counterfactuals: %d settled -> brain retrained", added)
         return added
@@ -404,8 +467,17 @@ class Orchestrator:
             )
         return r
 
+    def _watchdog_abort(self, stage: str) -> bool:
+        """Return True and log if the watchdog fired — caller should abort the cycle."""
+        if _wd.fired.is_set():
+            self.log.error("WATCHDOG fired during '%s' — aborting cycle, starting fresh next run", stage)
+            _wd.reset()
+            return True
+        return False
+
     # --- main cycle ---
     def run_once(self):
+        _wd.beat()
         self.log.info(
             "=== Cycle start (mode=%s, strategy=%s, bankroll=%.2f, brain_trained=%s) ===",
             self.mode.value, self.settings.strategy, self.bankroll(), self.brain.trained,
@@ -417,14 +489,18 @@ class Orchestrator:
             # must never run on synthetic/fallback data.
             self.log.error("HARD-FAIL: aborting cycle — %s", e)
             raise
+        _wd.beat()
         # Confirm/deny resting paper maker orders against the real price path BEFORE
         # managing open trades, so a maker filled this cycle becomes a normal open
         # position right away.
         self.resolve_pending_makers(markets)
+        _wd.beat()
         self.manage_open(markets)
+        _wd.beat()
         # Settle any counterfactuals whose scalp window has elapsed (Problem 1):
         # learns from vetoed/mirror setups via the real snapshot price path.
         self.settle_counterfactuals()
+        _wd.beat()
         # Circuit breaker (Teil B.2): check AFTER managing open trades (so today's
         # realized PnL / streak are fresh) and BEFORE opening anything new. When it
         # trips we open NOTHING this cycle; open positions are untouched (no abandon)
@@ -439,14 +515,27 @@ class Orchestrator:
             self.log.info("=== Cycle done: circuit breaker active, 0 trades placed ===")
             return []
         candidates = self.scan.run(markets)
+        _wd.beat()
+        if self._watchdog_abort("scan"):
+            return []
         reports = self.research.run(candidates)
+        _wd.beat()
+        if self._watchdog_abort("research"):
+            return []
         signals = self.predict.run(candidates, reports)
+        _wd.beat()
+        if self._watchdog_abort("predict"):
+            return []
         # Stage 5 meta-controller: the LLM agent approves/vetoes each signal before
         # it can reach execution, and records its reasoning to the DB.
         approved = self.manager.run(signals, reports)
+        _wd.beat()
+        if self._watchdog_abort("brainmanager"):
+            return []
         liq = {c.market.id: c.market.liquidity for c in candidates}
         spreads = {c.market.id: c.market.spread for c in candidates}
         placed = self.risk.run(approved, self.bankroll(), liq, spreads)
+        _wd.beat()
         # Record counterfactuals for what we did NOT trade (vetoed/sized-out) and the
         # mirror of what we did — settled next cycles via the snapshot price path.
         self._record_counterfactuals(signals, placed)

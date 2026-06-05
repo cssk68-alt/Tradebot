@@ -106,8 +106,26 @@ class PredictAgent(Agent):
             # Score the actual trade (direction + edge), not a generic setup, and
             # apply the CONFIGURED brain_weight (was hard-coded before).
             brain_feats = build_brain_features(feats, is_yes, edge)
-            brain_score = self.brain.score(brain_feats)
+            diag = self.brain.score_diagnostics(brain_feats)
+            brain_score = diag["brain_score"]
             brain_adj = s.brain_weight * (brain_score - 0.5)
+
+            # Log raw brain output for score-collapse detection
+            if brain_score < 0.01:
+                self.log.info(
+                    "Brain: score=%.4f for '%s' %s edge=%.4f "
+                    "(z2_raw=%.2f, active_neurons=%d)",
+                    brain_score, m.question[:30],
+                    "YES" if is_yes else "NO", edge,
+                    diag["z2_raw"], diag["active_neurons"],
+                )
+            # Log every 100th signal at info level for overall awareness
+            elif brain_score > 0.5:
+                self.log.info(
+                    "Brain: score=%.4f (high) for '%s' %s edge=%.4f",
+                    brain_score, m.question[:30],
+                    "YES" if is_yes else "NO", edge,
+                )
 
             confidence = min(
                 1.0,
@@ -125,4 +143,6 @@ class PredictAgent(Agent):
             )
 
         self.log.info("Predict: %d signals from %d candidates", len(signals), len(candidates))
+        # Check for score collapse after processing a batch
+        self.brain.check_score_collapse()
         return signals

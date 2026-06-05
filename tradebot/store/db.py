@@ -57,6 +57,16 @@ CREATE TABLE IF NOT EXISTS manager_decisions (
     model_prob REAL, brain_score REAL, edge REAL, is_yes INTEGER,
     rss_sentiment REAL, reddit_sentiment REAL, created_at TEXT
 );
+CREATE TABLE IF NOT EXISTS execution_queue (
+    execution_id TEXT PRIMARY KEY,
+    market_id TEXT NOT NULL,
+    is_yes INTEGER NOT NULL,
+    order_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    retries INTEGER DEFAULT 0,
+    last_error TEXT DEFAULT ''
+);
 """
 
 
@@ -396,6 +406,56 @@ class Store:
             )
             for r in rows
         ]
+
+    # --- execution queue ---
+
+    def enqueue_execution(
+        self, execution_id: str, market_id: str, is_yes: bool, order_json: str
+    ) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO execution_queue"
+            "(execution_id, market_id, is_yes, order_json, created_at)"
+            " VALUES (?,?,?,?,?)",
+            (execution_id, market_id, int(is_yes), order_json,
+             datetime.now(timezone.utc).isoformat()),
+        )
+        self.conn.commit()
+
+    def pending_executions(self) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT execution_id, market_id, is_yes, order_json, retries"
+            " FROM execution_queue WHERE status='pending' ORDER BY created_at ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_execution_done(self, execution_id: str) -> None:
+        self.conn.execute(
+            "UPDATE execution_queue SET status='done' WHERE execution_id=?",
+            (execution_id,),
+        )
+        self.conn.commit()
+
+    def mark_execution_failed(self, execution_id: str, error: str) -> None:
+        self.conn.execute(
+            "UPDATE execution_queue SET status='failed', last_error=? WHERE execution_id=?",
+            (error[:500], execution_id),
+        )
+        self.conn.commit()
+
+    def bump_execution_retry(self, execution_id: str, error: str) -> None:
+        self.conn.execute(
+            "UPDATE execution_queue SET retries=retries+1, last_error=? WHERE execution_id=?",
+            (error[:500], execution_id),
+        )
+        self.conn.commit()
+
+    def has_open_execution(self, market_id: str, is_yes: bool, mode: "Mode") -> bool:
+        """True if an open trade for this market+side already exists (idempotency guard)."""
+        row = self.conn.execute(
+            "SELECT id FROM trades WHERE market_id=? AND is_yes=? AND mode=? AND status='open' LIMIT 1",
+            (market_id, int(is_yes), mode.value),
+        ).fetchone()
+        return row is not None
 
     def close(self) -> None:
         self.conn.close()

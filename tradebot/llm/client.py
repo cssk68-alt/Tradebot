@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -87,20 +88,35 @@ class LLMClient(ABC):
     def _complete_logged(
         self, system: str, user: str, max_tokens: int = 512, *, task: str = "", ctx: str = ""
     ) -> Optional[str]:
-        """``_complete`` plus a full transcript of the call.
+        """``_complete`` with retry (3 attempts, 60 s timeout per attempt), START/DONE
+        logging, and watchdog heartbeats so a hung provider is visible immediately."""
+        from tradebot import watchdog as _wd
 
-        Writes the exact prompt and answer (and per-call token use) to
-        ``data/llm_log.jsonl`` and prints a short one-line summary, so the model
-        conversation is visible instead of an opaque ``200 OK``. Returns exactly
-        what ``_complete`` returned, so callers' parsing is unchanged. All
-        logging errors are swallowed: they must never break a trading cycle."""
+        _log = get_logger("llm")
+        short_ctx = ctx if len(ctx) <= 50 else ctx[:50] + "..."
+        label = task or "llm"
+
+        _log.info("START %s | %s", label, _ascii(short_ctx))
+
+        out: Optional[str] = None
         before_in = getattr(self, "prompt_tokens", 0)
         before_out = getattr(self, "completion_tokens", 0)
-        out = self._complete(system, user, max_tokens)
+
+        for attempt in range(3):
+            _wd.beat()  # reset watchdog before each attempt
+            if attempt > 0:
+                _log.warning("LLM retry %d/3 — task=%s ctx=%s", attempt + 1, label, _ascii(short_ctx))
+                time.sleep(2 ** attempt)  # 2 s, 4 s back-off
+            out = self._complete(system, user, max_tokens)
+            if out is not None:
+                break
+            _log.warning("LLM attempt %d/3 returned no answer — task=%s", attempt + 1, label)
+
+        _wd.beat()  # still alive after all attempts
         din = getattr(self, "prompt_tokens", 0) - before_in
         dout = getattr(self, "completion_tokens", 0) - before_out
 
-        # File: the complete, machine-readable record (UTF-8, untruncated).
+        # File: complete machine-readable transcript (UTF-8, untruncated).
         try:
             path = _llm_log_path()
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -120,15 +136,10 @@ class LLMClient(ABC):
         except Exception:
             pass
 
-        # Console: short, readable, cp1252-safe one-liner.
-        answer = out if out is not None else "(no answer - call failed)"
-        short_ctx = ctx if len(ctx) <= 50 else ctx[:50] + "..."
+        answer = out if out is not None else "(no answer - all attempts failed)"
         ans1 = " ".join(answer.split())
         short_ans = ans1 if len(ans1) <= 100 else ans1[:100] + "..."
-        get_logger("llm").info(
-            "%s | %s -> %s (in=%d out=%d tok)",
-            task or "llm", _ascii(short_ctx), _ascii(short_ans), din, dout,
-        )
+        _log.info("DONE %s | %s → %s (in=%d out=%d tok)", label, _ascii(short_ctx), _ascii(short_ans), din, dout)
         return out
 
     # --- tasks (provider-independent) ---
@@ -208,7 +219,10 @@ class LLMClient(ABC):
         system = (
             "You are the BrainManager, the final risk meta-controller for a prediction-market "
             "trading bot. You receive the XGBoost probability that YES resolves, the neural-net "
-            "(MLP) veto score in [0,1] (higher = more confident the trade wins), the executable "
+            "(MLP) veto score in [0,1] — P(the TRADED side wins); this is NOT P(YES). "
+            "On a NO trade, a score of 0.0 means the MLP predicts the NO bet will LOSE, not that "
+            "it confirms the NO side. Higher always means more confidence in the specific traded "
+            "direction; lower always means less. The executable "
             "edge, and SEPARATE social (Bluesky/HN/Lemmy/Reddit) vs RSS sentiment. Approve only if "
             "the signals are mutually consistent; veto if you detect a logical contradiction — e.g. "
             "sentiment strongly opposes the traded side, the MLP veto score is low while the edge "
@@ -220,7 +234,7 @@ class LLMClient(ABC):
         user = (
             f"Traded side: {side}\n"
             f"XGBoost P(YES): {model_prob:.3f}\n"
-            f"MLP veto score: {brain_score:.3f}\n"
+            f"MLP veto score P({side} wins): {brain_score:.3f}\n"
             f"Executable edge: {edge:+.3f}\n"
             f"RSS sentiment: {rss_sentiment:+.2f} from {rss_sources} sources\n"
             f"Social sentiment: {reddit_sentiment:+.2f} from {reddit_sources} sources"

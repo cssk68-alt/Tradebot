@@ -17,6 +17,8 @@ class PostmortemAgent(Agent):
         self.client = client
 
     def run(self, resolved: list[Trade]) -> list[Lesson]:
+        if resolved:
+            self.log.info("Postmortem: analyzing %d resolved trade(s) via LLM", len(resolved))
         lessons: list[Lesson] = []
         for t in resolved:
             lesson = self._analyze(t)
