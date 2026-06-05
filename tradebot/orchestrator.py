@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 from tradebot import watchdog as _wd
 from tradebot.agents.brain_manager import BrainManager
+from tradebot.agents.meta_learner import MetaLearner
 from tradebot.agents.postmortem import PostmortemAgent
 from tradebot.agents.predict import PredictAgent
 from tradebot.agents.research import ResearchAgent
@@ -46,8 +47,16 @@ class Orchestrator:
             )
 
         self.store = Store(settings.db_path)
+        # FULL SYSTEM RESET: delete all trade history, learning data,
+        # derived rules, and heuristics. Starts as a "baby brain".
+        if not self.store.reset_flag_has_run():
+            self.log.warning("SYSTEM RESET: Deleting ALL trade history, experiences, rules and heuristics")
+            self.store.reset_all_learning()
+            self.store.mark_reset_done()
+            self.log.info("RESET complete � system starts with zero experience")
         self.gamma = GammaClient(log)
         self.brain = Brain(settings.brain_path, log, l2=float(getattr(settings, "brain_l2", 0.0)))
+        self.brain.load_patterns(self.store)
         self.predictor = Predictor(log)
         self.mode = Mode.LIVE if settings.mode == "live" else Mode.PAPER
 
@@ -64,8 +73,9 @@ class Orchestrator:
             settings, self.store, log, self.predictor, self.brain, self.client
         )
         self.manager = BrainManager(settings, self.store, log, self.client)
-        self.risk = RiskAgent(settings, self.store, log, self.exchange, self.confirm)
+        self.risk = RiskAgent(settings, self.store, log, self.exchange, brain=self.brain, confirm=self.confirm)
         self.postmortem = PostmortemAgent(settings, self.store, log, self.client)
+        self.meta_learner = MetaLearner(settings, self.store, log, self.brain, self.client)
         # Set by run_once when the circuit breaker trips, so a loop driver (server
         # / CLI) can stop the run and wind down open positions gracefully.
         self.breaker_reason = ""
@@ -237,6 +247,7 @@ class Orchestrator:
                 # just logs that we added weighted experiences.
                 pass
             self._train_models()
+            self.brain.save_patterns(self.store)
             self.log.info("Counterfactuals: %d settled -> brain retrained", added)
         return added
 
@@ -272,13 +283,21 @@ class Orchestrator:
             "%s %d trades (%d net-positive) pnl %.2f", verb, len(resolved), wins,
             sum(r.pnl for r in resolved),
         )
-        self.postmortem.run(resolved)
+                self.postmortem.run(resolved)
+        for r in resolved:
+            self.brain.record_outcome(r)
+        self.brain.save_patterns(self.store)
         self._train_models()  # brain + predictor learn; carries over to live mode
         # Surface the empirical max-hold advice when the distribution suggests a
         # change (advice only — the slider stays the operator's).
         rec = self.hold_recommendation()
         if rec.get("status") == "ok" and rec.get("direction") != "keep":
             self.log.info("Hold-Analyse: %s", rec["message"])
+                # Meta-Learning LLM ("Anwalt / For-The-Future Learner") — pure observer.
+        # Runs AFTER all decisions, patterns, and training. Never influences trades.
+        insight = self.meta_learner.run(resolved)
+        if insight is not None:
+            self.brain.set_meta_insight(insight.model_dump())
 
     def settle_open(self):
         """Hold-to-event settlement (the `settle` poller) — REAL resolution, no dice."""

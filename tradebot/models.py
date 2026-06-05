@@ -213,6 +213,20 @@ class Lesson(BaseModel):
     text: str = ""
 
 
+class MetaInsight(BaseModel):
+    """Output of the Meta-Learning LLM ("Anwalt / For-The-Future Learner").
+
+    Strictly observer-only. Never influences live decisions.
+    Represents ONE meta-analysis cycle over a batch of resolved trades.
+    """
+    insight_summary: list[str] = Field(default_factory=list)  # max 5 bullets
+    confidence_of_insight: float = 0.0  # 0..1
+    category_tags: list[str] = Field(default_factory=list)  # e.g. volatility, sentiment_lag
+    suggested_future_hypotheses: list[str] = Field(default_factory=list)  # NOT rules
+    n_trades_analyzed: int = 0
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ManagerDecision(BaseModel):
     """The BrainManager's (Claude Haiku) final verdict on a signal — persisted for
     every judged signal so its reasoning is auditable in the local database."""

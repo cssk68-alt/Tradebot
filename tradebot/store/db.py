@@ -67,6 +67,11 @@ CREATE TABLE IF NOT EXISTS execution_queue (
     retries INTEGER DEFAULT 0,
     last_error TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS pattern_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    state_json TEXT NOT NULL,
+    saved_at TEXT NOT NULL
+);
 """
 
 
@@ -456,6 +461,60 @@ class Store:
             (market_id, int(is_yes), mode.value),
         ).fetchone()
         return row is not None
+
+    # ---- Pattern Engine persistence ----
+
+    def save_pattern_state(self, state: dict) -> None:
+        """Persist PatternEngine state (overwrites previous saved state)."""
+        import json
+        self.conn.execute("DELETE FROM pattern_rules")
+        self.conn.execute(
+            "INSERT INTO pattern_rules(state_json, saved_at) VALUES (?,?)",
+            (json.dumps(state), datetime.now(timezone.utc).isoformat()),
+        )
+        self.conn.commit()
+
+    def load_pattern_state(self) -> Optional[dict]:
+        """Load the most recently saved PatternEngine state."""
+        import json
+        row = self.conn.execute(
+            "SELECT state_json FROM pattern_rules ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            return json.loads(row[0])
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    # ---- System Reset ----
+
+    def reset_all_learning(self) -> None:
+        """DELETE ALL trades, experiences, counterfactuals, lessons, manager_decisions,
+        and pattern state. Keeps snapshots (price history is not learning data) and
+        the schema. Called once on first startup after the reset system is deployed."""
+        tables = ["trades", "experiences", "counterfactuals", "lessons", "manager_decisions", "pattern_rules"]
+        for tbl in tables:
+            self.conn.execute(f"DELETE FROM {tbl}")
+        self.conn.commit()
+
+    def reset_flag_has_run(self) -> bool:
+        """Check if reset has already been performed (idempotent reset)."""
+        try:
+            row = self.conn.execute(
+                "SELECT 1 FROM pattern_rules WHERE state_json='__RESET_DONE__' LIMIT 1"
+            ).fetchone()
+            return row is not None
+        except Exception:
+            return False
+
+    def mark_reset_done(self) -> None:
+        """Mark reset as completed so it only runs once."""
+        self.conn.execute(
+            "INSERT INTO pattern_rules(state_json, saved_at) VALUES (?,?)",
+            ("__RESET_DONE__", datetime.now(timezone.utc).isoformat()),
+        )
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

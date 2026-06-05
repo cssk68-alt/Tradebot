@@ -26,9 +26,10 @@ _MAX_EXEC_RETRIES = 3
 class RiskAgent(Agent):
     name = "risk"
 
-    def __init__(self, settings, store, log, exchange, confirm: Optional[Callable] = None):
+    def __init__(self, settings, store, log, exchange, brain=None, confirm: Optional[Callable] = None):
         super().__init__(settings, store, log)
         self.exchange = exchange
+        self.brain = brain
         self.confirm = confirm
 
     def run(
@@ -37,14 +38,21 @@ class RiskAgent(Agent):
         bankroll: float,
         liquidity_by_market: dict[str, float],
         spread_by_market: dict[str, float] | None = None,
+        sentiment_by_market: dict[str, float] | None = None,
     ) -> list[Trade]:
         placed: list[Trade] = []
         exposure = self.store.open_exposure(self.exchange.mode)
         spread_by_market = spread_by_market or {}
+        sentiment_by_market = sentiment_by_market or {}
 
         for sig in signals:
             liq = liquidity_by_market.get(sig.market_id, 1e9)
-            decision = size_position(sig, bankroll, self.settings, exposure, liq)
+            # Evaluate against emerged patterns (probabilistic rule learning)
+            pattern_eval = self.brain.evaluate_patterns(sig) if self.brain else {}
+            # Attach sentiment agreement for pattern engine (if available)
+            if self.brain:
+                setattr(sig, 'sentiment_agreement', sentiment_by_market.get(sig.market_id, 0.5))
+            decision = size_position(sig, bankroll, self.settings, exposure, liq, pattern_eval=pattern_eval)
             if not decision.approved:
                 self.log.info("Risk: skip '%s' — %s", sig.question[:40], decision.reason)
                 continue

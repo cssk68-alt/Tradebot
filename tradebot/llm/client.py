@@ -250,6 +250,48 @@ class LLMClient(ABC):
         except Exception:
             return None
 
+    def meta_learn(self, trade_history: str) -> Optional[dict]:
+        """Meta-Learning LLM ("Anwalt / For-The-Future Learner").
+
+        Analyzes a batch of completed trades (input -> decision -> outcome) and
+        returns structured insights about recurring structural patterns. This is
+        strictly OBSERVER-ONLY — never influences live decisions.
+
+        Returns dict with keys:
+          - insight_summary: list[str] (max 5)
+          - confidence_of_insight: float (0..1)
+          - category_tags: list[str]
+          - suggested_future_hypotheses: list[str] (NOT rules)
+        """
+        out = self._complete_logged(
+            "You are \"Der Anwalt\" — the For-The-Future Learner. Your ONLY role is to "
+            "observe and analyze completed trades. You do NOT make decisions, you do NOT "
+            "modify risk, you do NOT block or approve trades. You detect recurring structural "
+            "patterns and identify weaknesses in the trading system.\n\n"
+            "Analyze this batch of trades. Compare LLM predictions vs real outcomes. "
+            "Look for: systematic over/undervaluation in certain categories, sentiment lag "
+            "in fast regimes, pattern engine underreaction to volatility, consistency issues.\n\n"
+            "Respond ONLY with JSON: "
+            '{"insight_summary": ["<max 5 short bullet points>"], '
+            '"confidence_of_insight": <0..1>, '
+            '"category_tags": ["<tag1>", "<tag2>", ...], '
+            '"suggested_future_hypotheses": ["<not rules, just hypotheses for future observation>"]}',
+            trade_history,
+            max_tokens=500, task="meta_learn", ctx="batch analysis",
+        )
+        if not out:
+            return None
+        try:
+            d = json.loads(_json_slice(out))
+            return {
+                "insight_summary": d.get("insight_summary", [])[:5],
+                "confidence_of_insight": max(0.0, min(1.0, float(d.get("confidence_of_insight", 0.0)))),
+                "category_tags": d.get("category_tags", []),
+                "suggested_future_hypotheses": d.get("suggested_future_hypotheses", []),
+            }
+        except Exception:
+            return None
+
     def postmortem(self, trade_desc: str):
         out = self._complete_logged(
             "You are five expert analysts (data, signal, risk, market, timing) running a "

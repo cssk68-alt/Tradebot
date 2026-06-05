@@ -1,26 +1,52 @@
 """Stage 5 'brain': loads/saves the neural net, trains from experience (wins AND
 losses), and produces the brain-score that gates stages 3 and 4. The weights live
-in `data/` and load in both paper and live mode, so learning carries over."""
+in `data/` and load in both paper and live mode, so learning carries over.
+
+PROBABILISTIC EMERGENT RULE LEARNING
+-------------------------------------
+The Brain now integrates a PatternEngine that independently learns from
+experience via a 4-stage emergence pipeline:
+  1. OBSERVATION    (1-5)      - soft signal only
+  2. WEAK PATTERN   (6-20)     - minor risk_penalty_score adjustment
+  3. STRONG PATTERN (21-80)    - significant confidence_modifier + soft steering
+  4. HARD CONSTRAINT (80-100+) - only NOW may a hard rule be created
+
+The neural net (NeuralBrain / TorchBrain) learns P(trade wins) from feature
+vectors. The PatternEngine learns context-level biases (side bias, edge range,
+price range) from outcome patterns across multiple trades. They are complementary:
+the net answers "how likely is THIS specific setup to win?" while the pattern
+engine answers "what does history say about this TYPE of trade?"
+"""
 from __future__ import annotations
 
 from tradebot.brain.experience import to_xy, to_weighted_xy
 from tradebot.brain.network import make_brain
+from tradebot.brain.patterns import PatternEngine
 from tradebot.ml.features import BRAIN_FEATURE_DIM, BRAIN_FEATURE_NAMES
 from tradebot.models import Experience
+from tradebot.store.db import Store
 
 
 class Brain:
     def __init__(self, path, log, input_dim: int = BRAIN_FEATURE_DIM, l2: float = 0.0):
         self.path = str(path)
         self.log = log
-        self.l2 = float(l2)  # L2 weight-decay used for training + OOS validation
+        self.l2 = float(l2)
         self.net = make_brain(input_dim)
         if self.net.load(self.path):
             self.log.info("Brain: loaded existing weights from %s", self.path)
 
+        # Probabilistic Pattern Engine - emerges rules from trade outcomes
+        # across 4 stages, never from single events.
+        self.patterns = PatternEngine(log)
+
+    @property
+    def trained(self) -> bool:
+        return self.net.trained
+
+    # ---- Neural net methods ----
+
     def _compatible_xy(self, experiences: list[Experience]):
-        """Drop rows from an older (narrower) feature schema so growing the feature
-        set never crashes training; returns (X, y) the current net can consume."""
         X, y = to_xy(experiences)
         dim = self.net.input_dim
         compat = [(xi, yi) for xi, yi in zip(X, y) if len(xi) == dim]
@@ -33,9 +59,6 @@ class Brain:
         return [xi for xi, _ in compat], [yi for _, yi in compat]
 
     def _compatible_weighted_xy(self, experiences: list[Experience]):
-        """Like _compatible_xy but returns sample weights from to_weighted_xy.
-        Counterfactual rows get a reduced weight (default 0.35) so the net learns
-        from real trades ~3x more than from mirror/veto simulations."""
         X, y, w = to_weighted_xy(experiences)
         dim = self.net.input_dim
         compat = [(xi, yi, wi) for xi, yi, wi in zip(X, y, w) if len(xi) == dim]
@@ -48,8 +71,6 @@ class Brain:
         return [xi for xi, _, _ in compat], [yi for _, yi, _ in compat], [wi for _, _, wi in compat]
 
     def train_from_experiences(self, experiences: list[Experience]) -> bool:
-        # Use weighted training: counterfactual samples contribute less
-        # so real trades dominate the learning signal.
         X, y, w = self._compatible_weighted_xy(experiences)
         if self.net.train(X, y, l2=self.l2, sample_weights=w):
             self.net.save(self.path)
@@ -63,20 +84,18 @@ class Brain:
         return False
 
     def diagnostics(self, experiences: list[Experience]) -> dict:
-        """Out-of-sample metrics + feature importance (REPORTING only; the
-        production net above still trains on all data)."""
         from tradebot.brain.validation import diagnose
 
         X, y = self._compatible_xy(experiences)
-        return diagnose(make_brain, self.net.input_dim, X, y, BRAIN_FEATURE_NAMES, l2=self.l2)
+        diag = diagnose(make_brain, self.net.input_dim, X, y, BRAIN_FEATURE_NAMES, l2=self.l2)
+        diag["pattern_engine"] = self.patterns.stats()
+        diag["patterns"] = self.patterns.list_patterns()
+        return diag
 
     def score(self, features: list[float]) -> float:
-        """P(this setup wins) in [0, 1]; 0.5 when untrained (cold start)."""
         return self.net.predict(features)
 
     def score_diagnostics(self, features: list[float]) -> dict:
-        """Full diagnostics for one inference call: includes raw pre-sigmoid
-        value and score, for logging in predict.py."""
         raw = self.net.predict_raw(features)
         return {
             "brain_score": raw["score"],
@@ -85,18 +104,74 @@ class Brain:
         }
 
     def check_score_collapse(self, threshold: float = 0.001) -> bool:
-        """Warn if recent brain scores have near-zero variance (collapse to
-        constant output). Returns True if the variance is suspiciously low."""
         var = self.net.score_variance(window=20)
         if var < threshold and self.net.trained:
             self.log.warning(
                 "Brain: score variance over last 20 predictions = %.6f "
-                "(below %.4f threshold) — scores may be collapsing to constant",
+                "(below %.4f threshold) - scores may be collapsing to constant",
                 var, threshold,
             )
             return True
         return False
 
-    @property
-    def trained(self) -> bool:
-        return self.net.trained
+    # ---- Pattern Engine integration ----
+
+    def record_outcome(self, resolved_trade) -> None:
+        """Feed a resolved trade outcome into the PatternEngine."""
+        self.patterns.record_outcome(
+            is_yes=resolved_trade.is_yes,
+            edge=resolved_trade.edge,
+            confidence=resolved_trade.brain_score,
+            brain_score=resolved_trade.brain_score,
+            entry_price=resolved_trade.entry_price,
+            spread=0.0,
+            sentiment_agreement=0.5,
+            won=bool(resolved_trade.won),
+            pnl=resolved_trade.pnl,
+        )
+
+    def evaluate_patterns(self, signal) -> dict:
+        """Evaluate a trade candidate against all emerged patterns."""
+        return self.patterns.evaluate(
+            is_yes=signal.is_yes,
+            edge=signal.edge,
+            confidence=signal.confidence,
+            brain_score=signal.brain_score,
+            entry_price=signal.market_price,
+        )
+
+    def pattern_stats(self) -> dict:
+        return self.patterns.stats()
+
+    def list_patterns(self) -> list[dict]:
+        return self.patterns.list_patterns()
+
+        # ---- Meta-Learning LLM insight (observer-only) ----
+
+    def set_meta_insight(self, insight: Optional[dict]) -> None:
+        """Store the latest For-The-Future Learner insight.
+
+        This is strictly observer data — never used in decision-making.
+        Stored here so the dashboard can access it via the brain reference.
+        The orchestrator sets it after calling meta_learner.run().
+        """
+        self._meta_insight = insight
+
+    def meta_insight(self) -> Optional[dict]:
+        return getattr(self, '_meta_insight', None)
+
+    # ---- Serialisation ----
+
+    def save_patterns(self, store: Store) -> None:
+        store.save_pattern_state(self.patterns.to_saveable())
+
+    def load_patterns(self, store: Store) -> None:
+        data = store.load_pattern_state()
+        if data:
+            self.patterns = PatternEngine.from_saveable(data, self.log)
+            ps = self.patterns.stats()
+            if ps["total_emerged_patterns"] > 0:
+                self.log.info(
+                    "PatternEngine: loaded %d patterns (%d observations, %d hard rules)",
+                    ps["total_emerged_patterns"], ps["total_observations"], ps["hard_rules"],
+                )
